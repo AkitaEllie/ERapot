@@ -4,8 +4,13 @@ use App\Enums\Jenjang;
 use App\Enums\Semester;
 use App\Enums\TipeIndikator;
 use App\Models\IndikatorCapaian;
+use App\Models\Kelas;
 use App\Models\MataPelajaran;
+use App\Models\Narasi;
+use App\Models\NilaiSiswa;
 use App\Models\ProgramPengembangan;
+use App\Models\Rapor;
+use App\Models\Siswa;
 use App\Models\TahunAjaran;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -94,4 +99,54 @@ it('menghapus indikator', function (): void {
         ->call('hapus', $indikator->getKey());
 
     expect(IndikatorCapaian::query()->find($indikator->getKey()))->toBeNull();
+});
+
+it('menolak menghapus indikator yang sudah memiliki nilai siswa', function (): void {
+    $mapel = MataPelajaran::factory()->create(['Tampilkan_Indikator' => true]);
+    $program = ProgramPengembangan::factory()->create(['Mapel_ID' => $mapel->getKey()]);
+    $indikator = IndikatorCapaian::factory()->create([
+        'Program_ID' => $program->getKey(),
+        'TahunAjaran_ID' => TahunAjaran::query()->where('Is_Active', true)->firstOrFail()->getKey(),
+    ]);
+
+    $narasi = Narasi::factory()->create([
+        'Rapor_ID' => Rapor::factory()->create([
+            'Siswa_ID' => Siswa::factory()->create()->getKey(),
+            'Kelas_ID' => Kelas::factory()->create()->getKey(),
+        ])->getKey(),
+    ]);
+    NilaiSiswa::factory()->create([
+        'Indikator_ID' => $indikator->getKey(),
+        'Narasi_ID' => $narasi->getKey(),
+    ]);
+
+    Livewire::test('pages::indikator')
+        ->call('hapus', $indikator->getKey())
+        ->assertHasNoErrors()
+        ->assertSee('tidak dapat dihapus');
+
+    expect(IndikatorCapaian::query()->find($indikator->getKey()))->not->toBeNull();
+});
+
+it('mempertahankan nilai siswa saat indikator ditolak dihapus', function (): void {
+    $mapel = MataPelajaran::factory()->create(['Tampilkan_Indikator' => true]);
+    $program = ProgramPengembangan::factory()->create(['Mapel_ID' => $mapel->getKey()]);
+    $indikator = IndikatorCapaian::factory()->create([
+        'Program_ID' => $program->getKey(),
+        'TahunAjaran_ID' => TahunAjaran::query()->where('Is_Active', true)->firstOrFail()->getKey(),
+    ]);
+    $narasi = Narasi::factory()->create([
+        'Rapor_ID' => Rapor::factory()->create([
+            'Siswa_ID' => Siswa::factory()->create()->getKey(),
+            'Kelas_ID' => Kelas::factory()->create()->getKey(),
+        ])->getKey(),
+    ]);
+    $nilai = NilaiSiswa::factory()->create([
+        'Indikator_ID' => $indikator->getKey(),
+        'Narasi_ID' => $narasi->getKey(),
+    ]);
+
+    Livewire::test('pages::indikator')->call('hapus', $indikator->getKey());
+
+    expect(NilaiSiswa::query()->find($nilai->getKey()))->not->toBeNull();
 });

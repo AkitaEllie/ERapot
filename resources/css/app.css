@@ -32,3 +32,11 @@
     --color-accent-deep: #04633b;
     --color-accent-soft: #dfe8e2;
 }
+
+/*
+ * Alpine hides x-cloak elements only once it initialises; without this rule a
+ * popout that starts closed is briefly visible during page load.
+ */
+[x-cloak] {
+    display: none !important;
+}

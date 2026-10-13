@@ -135,7 +135,17 @@ class extends \Livewire\Component
 
     public function hapus(string $indikatorId): void
     {
-        IndikatorCapaian::query()->findOrFail($indikatorId)->delete();
+        $indikator = IndikatorCapaian::query()->findOrFail($indikatorId);
+
+        // The foreign key is restrictOnDelete, so an indicator carrying recorded
+        // scores must not be removed; deleting it would discard student grades.
+        if ($indikator->nilaiSiswa()->exists()) {
+            session()->flash('galat', 'Indikator ini sudah memiliki nilai siswa sehingga tidak dapat dihapus.');
+
+            return;
+        }
+
+        $indikator->delete();
 
         session()->flash('sukses', 'Indikator dihapus.');
     }
