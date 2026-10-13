@@ -18,11 +18,10 @@
 <table class="w-full border-collapse text-[13px]">
     <tbody>
         <tr class="text-center font-bold">
-            <td class="w-[200px] border border-[#333] px-2 py-1">Kehadiran</td>
+            <td class="w-[200px] border border-[#333] px-2 py-1" rowspan="3">Kehadiran</td>
             <td class="border border-[#333] px-2 py-1" colspan="2">Tanda Tangan</td>
         </tr>
         <tr class="text-center font-bold">
-            <td class="border border-[#333] px-2 py-1" rowspan="2"></td>
             <td class="border border-[#333] px-2 py-1">Guru kelas</td>
             <td class="border border-[#333] px-2 py-1">Orangtua /wali murid</td>
         </tr>

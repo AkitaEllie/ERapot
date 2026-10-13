@@ -24,7 +24,10 @@
         <div class="flex h-screen overflow-hidden">
             <x-app.sidebar :active="$active ?? 'dashboard'" />
 
-            <div class="flex min-w-0 flex-1 flex-col overflow-hidden">
+            {{-- Livewire wraps the page in its own root element, so this column has to
+                 carry the flex sizing: without it the wrapper is a block box sized by
+                 its content, and a page's `flex-1 overflow-y-auto` never resolves. --}}
+            <div class="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden [&>*]:flex [&>*]:min-h-0 [&>*]:flex-1 [&>*]:flex-col [&>*]:overflow-hidden">
                 {{ $slot }}
             </div>
         </div>

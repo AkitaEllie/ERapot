@@ -152,7 +152,8 @@ class extends \Livewire\Component
 
     <div class="flex-1 overflow-y-auto bg-canvas px-8 py-6">
         {{-- Rendered at A4 proportions so the preview matches the exported file. --}}
-        <article class="mx-auto w-[794px] bg-white px-[56px] py-[56px] text-[13px] leading-relaxed text-[#111] shadow-sm ring-1 ring-hairline">
+        <article class="rapor-dokumen mx-auto w-[794px] bg-white px-[56px] py-[56px] text-[13px] leading-relaxed text-[#111] shadow-sm ring-1 ring-hairline">
+            <x-rapor.gaya />
 
             @if ($this->waliKelas)
                 {{-- The homeroom teacher owns the whole book, as in contoh-rapor.pdf. --}}
