@@ -1,9 +1,13 @@
 <?php
 
+use App\Enums\JenisMataPelajaran;
 use App\Enums\RaporStatus;
+use App\Enums\StatusNarasi;
 use App\Models\MataPelajaran;
+use App\Models\Narasi;
+use App\Models\Pembelajaran;
 use App\Models\Rapor;
-use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Collection;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Layout;
 
@@ -29,30 +33,93 @@ class extends \Livewire\Component
         session()->flash('galat', 'Export PDF belum diimplementasikan.');
     }
 
+    /**
+     * Whether the signed-in teacher owns this class as its homeroom teacher.
+     *
+     * A homeroom teacher holds one class and produces the whole report book; a
+     * subject teacher spans all classes and produces only their own subject page.
+     */
     #[Computed]
-    public function narasiFinal(): array
+    public function waliKelas(): bool
     {
-        return $this->rapor->narasi()
-            ->whereNotNull('Narasi_Final')
-            ->with('mataPelajaran')
+        $user = auth()->user();
+
+        return $user !== null && $this->rapor->kelas->User_ID === $user->getKey();
+    }
+
+    /**
+     * The subjects this report should show.
+     *
+     * The homeroom teacher gets every subject; a subject teacher gets only the
+     * subjects they are assigned to teach in this class.
+     *
+     * @return Collection<int, array{mapel: MataPelajaran, narasi: ?Narasi, pengampu: ?\App\Models\User}>
+     */
+    #[Computed]
+    public function bagian(): Collection
+    {
+        $narasi = $this->rapor->narasi()
+            ->with(['nilaiSiswa', 'dokumentasi', 'mataPelajaran'])
             ->get()
-            ->mapWithKeys(fn ($narasi): array => [$narasi->Mapel_ID => $narasi])
+            ->keyBy('Mapel_ID');
+
+        $pengampu = Pembelajaran::query()
+            ->where('Kelas_ID', $this->rapor->Kelas_ID)
+            ->with('guru')
+            ->get()
+            ->keyBy('Mapel_ID');
+
+        return MataPelajaran::query()
+            ->whereIn('Mapel_ID', $pengampu->keys())
+            ->where('Tampilkan_Indikator', true)
+            ->when(! $this->waliKelas, fn ($query) => $query->whereIn('Mapel_ID', $this->mapelDiajarIds()))
+            ->orderBy('Nama_Mapel')
+            ->get()
+            ->map(fn (MataPelajaran $mapel): array => [
+                'mapel' => $mapel,
+                'narasi' => $narasi->get($mapel->getKey()),
+                'pengampu' => $pengampu->get($mapel->getKey())?->guru,
+            ]);
+    }
+
+    /**
+     * The subjects the signed-in teacher is assigned in this class.
+     *
+     * @return array<int, string>
+     */
+    private function mapelDiajarIds(): array
+    {
+        return Pembelajaran::query()
+            ->where('Kelas_ID', $this->rapor->Kelas_ID)
+            ->where('User_ID', auth()->user()?->getKey())
+            ->pluck('Mapel_ID')
             ->all();
     }
 
-    #[Computed]
-    public function fotoDokumentasi(): array
+    /** @return Collection<int, array{mapel: MataPelajaran, narasi: ?Narasi, pengampu: ?\App\Models\User}> */
+    public function seksiA(): Collection
     {
-        return $this->rapor->narasi()
-            ->with(['dokumentasi', 'mataPelajaran'])
-            ->get()
-            ->flatMap(fn ($narasi) => $narasi->dokumentasi->map(fn ($foto) => [
-                'foto' => $foto,
-                'mapel' => $narasi->mataPelajaran?->Nama_Mapel,
-            ]))
-            ->take(2)
-            ->values()
-            ->all();
+        return $this->bagian->filter(fn (array $b): bool => $b['mapel']->Jenis_Mapel === JenisMataPelajaran::Intrakurikuler)->values();
+    }
+
+    public function seksiB(): Collection
+    {
+        return $this->bagian->filter(fn (array $b): bool => $b['mapel']->Jenis_Mapel === JenisMataPelajaran::KoKurikuler)->values();
+    }
+
+    public function halamanTabel(): Collection
+    {
+        return $this->bagian->filter(fn (array $b): bool => $b['mapel']->Jenis_Mapel === JenisMataPelajaran::MuatanLokal)->values();
+    }
+
+    /**
+     * The report is only meaningful once narratives are final, but a draft can be
+     * previewed so the teacher can see how it will read.
+     */
+    #[Computed]
+    public function siapCetak(): bool
+    {
+        return $this->rapor->Status === RaporStatus::Disetujui;
     }
 };
 
@@ -60,7 +127,7 @@ class extends \Livewire\Component
 
 <div>
     <x-app.header
-        :title="'Pratinjau Rapor'"
+        title="Pratinjau Rapor"
         :subtitle="$rapor->siswa->Nama.' - '.$rapor->kelas->Nama_Kelas.' - Semester '.$rapor->Semester->label().' '.$rapor->kelas->tahunAjaran->Tahun_Ajaran"
     >
         <x-slot:actions>
@@ -70,7 +137,7 @@ class extends \Livewire\Component
         </x-slot:actions>
     </x-app.header>
 
-    @if ($rapor->Status !== RaporStatus::Disetujui)
+    @if (! $this->siapCetak)
         <div class="flex items-center gap-3 border-b border-hairline bg-notice-bg px-8 py-2.5 text-[14px] text-label">
             <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" class="size-5 shrink-0" aria-hidden="true">
                 <circle cx="10" cy="10" r="7.5"/><path d="M10 6.5v4.2M10 13.4h.01" stroke-linecap="round"/>
@@ -79,56 +146,53 @@ class extends \Livewire\Component
         </div>
     @endif
 
+    @if (session('galat'))
+        <div class="border-b border-hairline bg-rose-50 px-8 py-2.5 text-[14px] text-rose-800">{{ session('galat') }}</div>
+    @endif
+
     <div class="flex-1 overflow-y-auto bg-canvas px-8 py-6">
-        <article class="mx-auto w-[864px] bg-surface px-8 py-8 shadow-sm ring-1 ring-hairline">
-            <header class="border-b border-hairline pb-6 text-center">
-                <h2 class="text-[18px] font-semibold text-heading">LAPORAN PERKEMBANGAN PESERTA DIDIK</h2>
-                <p class="mt-1 text-[15px] text-body">TK Cinta Kasih Tzu Chi - Semester {{ $rapor->Semester->label() }} {{ $rapor->kelas->tahunAjaran->Tahun_Ajaran }}</p>
-            </header>
+        {{-- Rendered at A4 proportions so the preview matches the exported file. --}}
+        <article class="mx-auto w-[794px] bg-white px-[56px] py-[56px] text-[13px] leading-relaxed text-[#111] shadow-sm ring-1 ring-hairline">
 
-            <dl class="mt-6 grid grid-cols-2 gap-x-8 gap-y-3 text-[15px]">
-                <div class="flex gap-2"><dt class="w-28 text-muted">Nama</dt><dd class="text-body">: {{ $rapor->siswa->Nama }}</dd></div>
-                <div class="flex gap-2"><dt class="w-28 text-muted">NISN</dt><dd class="text-body">: {{ $rapor->siswa->NISN }}</dd></div>
-                <div class="flex gap-2"><dt class="w-28 text-muted">Kelas / Fase</dt><dd class="text-body">: {{ $rapor->kelas->Nama_Kelas }} / {{ $rapor->kelas->Jenjang->value }}</dd></div>
-                <div class="flex gap-2"><dt class="w-28 text-muted">Tinggi / Berat</dt><dd class="text-body">: {{ $rapor->Tinggi_Badan }} cm / {{ $rapor->Berat_Badan }} kg</dd></div>
-            </dl>
+            @if ($this->waliKelas)
+                {{-- The homeroom teacher owns the whole book, as in contoh-rapor.pdf. --}}
+                @include('components.rapor.identitas', ['rapor' => $rapor])
 
-            <div class="mt-8 space-y-6">
-                @foreach ($this->narasiFinal as $narasi)
-                    @if ($narasi->mataPelajaran instanceof MataPelajaran)
-                        <section>
-                            <h3 class="text-[15px] font-semibold text-heading">Nilai-nilai {{ $narasi->mataPelajaran->Nama_Mapel }}</h3>
-                            <p class="mt-1.5 text-[15px] leading-relaxed text-body">{{ $narasi->Narasi_Final }}</p>
-                        </section>
-                    @endif
-                @endforeach
-            </div>
-
-            @if (count($this->fotoDokumentasi) > 0)
-                <section class="mt-8 flex gap-6">
-                    @foreach ($this->fotoDokumentasi as $item)
-                        <figure class="w-[180px]">
-                            <img src="{{ Storage::url($item['foto']->Foto) }}" alt="{{ $item['foto']->Keterangan }}" class="h-[120px] w-[180px] rounded border border-hairline object-cover">
-                            <figcaption class="mt-1 truncate text-[13px] text-muted">{{ $item['mapel'] }}</figcaption>
-                        </figure>
+                {{-- A. INTRAKURIKULER --}}
+                @if ($this->seksiA()->isNotEmpty())
+                    <h2 class="mt-6 mb-3 font-bold">A. INTRAKURIKULER</h2>
+                    @foreach ($this->seksiA() as $item)
+                        <x-rapor.seksi-prosa :narasi="$item['narasi']" :mapel="$item['mapel']" />
                     @endforeach
-                </section>
+                @endif
+
+                {{-- B. KOKURIKULER --}}
+                @if ($this->seksiB()->isNotEmpty())
+                    <h2 class="mt-8 mb-3 font-bold">B. KOKURIKULER</h2>
+                    @foreach ($this->seksiB() as $item)
+                        <x-rapor.seksi-prosa
+                            :narasi="$item['narasi']"
+                            :mapel="$item['mapel']"
+                            :judul="'Deskripsi Pengembangan Proyek ('.$item['mapel']->Nama_Mapel.')'"
+                        />
+                    @endforeach
+                @endif
+
+                <x-rapor.penutup :rapor="$rapor" />
             @endif
 
-            <p class="mt-8 border-t border-hairline pt-4 text-[15px] text-body">
-                Ketidakhadiran: Sakit {{ $rapor->Sakit }} hari, Izin {{ $rapor->Izin }} hari, Tanpa Keterangan {{ $rapor->Tanpa_Keterangan }} hari
-            </p>
-
-            <div class="mt-10 flex justify-between gap-16 text-center text-[15px]">
-                <div>
-                    <p class="text-muted">Wali Kelas</p>
-                    <p class="mt-20 font-medium text-heading">{{ $rapor->kelas->waliKelas?->Nama ?? '-' }}</p>
+            {{-- Table-template subjects, one page each. A subject teacher sees only
+                 the subject they are assigned to in this class. --}}
+            @foreach ($this->halamanTabel() as $item)
+                <div class="{{ $loop->first && ! $this->waliKelas ? '' : 'mt-12 border-t-2 border-dashed border-hairline pt-10' }}">
+                    <x-rapor.seksi-tabel
+                        :narasi="$item['narasi']"
+                        :mapel="$item['mapel']"
+                        :rapor="$rapor"
+                        :pengampu="$item['pengampu']"
+                    />
                 </div>
-                <div>
-                    <p class="text-muted">Kepala Sekolah</p>
-                    <p class="mt-20 font-medium text-heading">{{ $rapor->disetujuiOleh?->Nama ?? '-' }}</p>
-                </div>
-            </div>
+            @endforeach
         </article>
     </div>
 </div>

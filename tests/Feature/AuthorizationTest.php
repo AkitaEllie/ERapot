@@ -13,13 +13,14 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 uses(RefreshDatabase::class);
 
 beforeEach(function (): void {
-    foreach (['ADMIN', 'GURU', 'TATAUSA', 'KEPSEKOL'] as $kode) {
+    foreach (['ADMIN', 'GURU', 'GURUWALI', 'TATAUSA', 'KEPSEKOL'] as $kode) {
         Role::factory()->bawaan($kode)->create();
     }
 
     $this->users = collect([
         'admin' => User::factory()->create(['Role_ID' => 'ADMIN']),
         'guru' => User::factory()->create(['Role_ID' => 'GURU']),
+        'guruWali' => User::factory()->create(['Role_ID' => 'GURUWALI']),
         'tataUsaha' => User::factory()->create(['Role_ID' => 'TATAUSA']),
         'kepsekol' => User::factory()->create(['Role_ID' => 'KEPSEKOL']),
     ]);
@@ -105,6 +106,18 @@ it('melindungi pratinjau rapor dan input rapor', function (): void {
     }
 });
 
+it('memberi guru wali kelas akses yang sama dengan guru mata pelajaran', function (): void {
+    foreach (['/rapor', '/indikator'] as $path) {
+        $this->actingAs($this->users['guruWali'])
+            ->get($path)
+            ->assertOk("guru wali kelas gagal membuka {$path}");
+    }
+
+    $this->actingAs($this->users['guruWali'])
+        ->get(route('rapor.pratinjau', $this->rapor))
+        ->assertOk();
+});
+
 it('membuka pratinjau rapor melalui jalur yang benar, bukan lewat {mapel}', function (): void {
     // The {mapel} catch-all must not swallow the pratinjau segment.
     $this->actingAs($this->users['guru'])
@@ -114,6 +127,11 @@ it('membuka pratinjau rapor melalui jalur yang benar, bukan lewat {mapel}', func
 
 it('memetakan capability per role sesuai class diagram', function (): void {
     expect($this->users['guru']->role->getHakAkses())
+        ->toContain('rapor', 'indikator', 'ekspor')
+        ->not->toContain('siswa', 'review');
+
+    // A homeroom teacher does everything a subject teacher does.
+    expect($this->users['guruWali']->role->getHakAkses())
         ->toContain('rapor', 'indikator', 'ekspor')
         ->not->toContain('siswa', 'review');
 

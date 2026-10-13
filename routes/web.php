@@ -51,6 +51,37 @@ Route::livewire('/rapor/{rapor}/{mapel}', 'pages::rapor-input')
     ->name('rapor.input')
     ->middleware(['auth', 'hak:rapor']);
 
+// Placeholder screens: named by the sidebar, never designed in the wireframe.
+// Kept non-functional on purpose so their status is unambiguous.
+Route::livewire('/ekspor-rapor', 'pages::ekspor-rapor')
+    ->name('ekspor-rapor')
+    ->middleware(['auth', 'hak:ekspor']);
+
+Route::livewire('/tahun-ajaran', 'pages::tahun-ajaran')
+    ->name('tahun-ajaran')
+    ->middleware(['auth', 'hak:tahun-ajaran']);
+
+Route::livewire('/pengguna', 'pages::pengguna')
+    ->name('pengguna')
+    ->middleware(['auth', 'hak:pengguna']);
+
+Route::livewire('/kelas', 'pages::kelas')
+    ->name('kelas')
+    ->middleware(['auth', 'hak:kelas']);
+
+Route::livewire('/mapel', 'pages::mapel')
+    ->name('mapel')
+    ->middleware(['auth', 'hak:mapel']);
+
+Route::livewire('/penugasan-mengajar', 'pages::penugasan-mengajar')
+    ->name('penugasan-mengajar')
+    ->middleware(['auth', 'hak:penugasan']);
+
+// Available to every signed-in role: a user changes only their own password.
+Route::livewire('/profil', 'pages::profil')
+    ->name('profil')
+    ->middleware('auth');
+
 Route::post('/logout', function (Request $request) {
     $request->user()->logout();
 

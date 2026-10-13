@@ -52,6 +52,16 @@
                 </div>
 
                 <form method="POST" action="{{ route('logout') }}" class="p-1.5">
+                    <a
+                        href="{{ route('profil') }}"
+                        role="menuitem"
+                        class="flex w-full items-center gap-2.5 rounded px-2.5 py-2 text-left text-[15px] text-body transition-colors hover:bg-sunken"
+                    >
+                        <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" class="size-4 shrink-0 text-muted" aria-hidden="true">
+                            <circle cx="10" cy="7.5" r="2.8"/><path d="M4.5 16.5c.6-2.6 2.7-4.2 5.5-4.2s4.9 1.6 5.5 4.2"/>
+                        </svg>
+                        Profil Saya
+                    </a>
                     @csrf
                     <button
                         type="submit"

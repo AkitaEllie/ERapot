@@ -58,6 +58,15 @@ class Role extends Model
             'ekspor',
         ],
 
+        // A homeroom teacher does everything a subject teacher does, on top of
+        // owning the full report book for their single class.
+        'GURUWALI' => [
+            'dashboard.guru',
+            'rapor',
+            'indikator',
+            'ekspor',
+        ],
+
         'TATAUSA' => [
             'dashboard.tata-usaha',
             'tahun-ajaran',

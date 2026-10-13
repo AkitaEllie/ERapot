@@ -14,21 +14,17 @@ class MataPelajaranFactory extends Factory
     /**
      * @return array<string, mixed>
      */
+    /**
+     * The name is generated rather than drawn from a fixed pool: the seeder
+     * defines several real subjects explicitly, and a pool entry that happens to
+     * match one of them would trip the unique index on Nama_Mapel.
+     *
+     * @return array<string, mixed>
+     */
     public function definition(): array
     {
         return [
-            'Nama_Mapel' => fake()->unique()->randomElement([
-                'Pendidikan Agama Islam',
-                'Pendidikan Pancasila',
-                'Bahasa Indonesia',
-                'Matematika',
-                'Ilmu Pengetahuan Alam',
-                'Ilmu Pengetahuan Sosial',
-                'Bahasa Inggris',
-                'Informatika',
-                'Pendidikan Jasmani',
-                'Seni Budaya',
-            ]),
+            'Nama_Mapel' => 'Mapel '.fake()->unique()->numerify('###'),
             'Jenis_Mapel' => fake()->randomElement(JenisMataPelajaran::cases()),
             'Tampilkan_Indikator' => true,
         ];

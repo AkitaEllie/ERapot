@@ -11,13 +11,14 @@ use Illuminate\Database\Eloquent\Factories\Factory;
 class RoleFactory extends Factory
 {
     /**
-     * The application's four built-in roles, keyed by their readable code.
+     * The application's built-in roles, keyed by their readable code.
      *
      * @var array<string, string>
      */
     public const ROLES = [
         'ADMIN' => 'Administrator',
-        'GURU' => 'Guru',
+        'GURU' => 'Guru Mata Pelajaran',
+        'GURUWALI' => 'Guru Wali Kelas',
         'TATAUSA' => 'Tata Usaha',
         'KEPSEKOL' => 'Kepala Sekolah',
     ];

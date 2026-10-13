@@ -21,8 +21,13 @@ class RoleSeeder extends Seeder
         ],
         'GURU' => [
             'role_id' => 'GURU',
-            'nama' => 'Guru',
-            'deskripsi' => 'Mengisi nilai dan menyusun narasi rapor.',
+            'nama' => 'Guru Mata Pelajaran',
+            'deskripsi' => 'Mengisi nilai dan menyusun narasi untuk mata pelajaran yang diampu di seluruh kelas.',
+        ],
+        'GURUWALI' => [
+            'role_id' => 'GURUWALI',
+            'nama' => 'Guru Wali Kelas',
+            'deskripsi' => 'Mengampu satu kelas dan menyusun serta mengekspor rapor lengkap kelas tersebut.',
         ],
         'TATAUSA' => [
             'role_id' => 'TATAUSA',

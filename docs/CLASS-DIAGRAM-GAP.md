@@ -1,216 +1,117 @@
 # Class Diagram Gap Analysis
 
-Audit of `docs/-DIAGRAM SKRIPSI.drawio.xml` against the implementation, as of the
-11-screen build.
+Audit of `docs/copy of master -DIAGRAM SKRIPSI.drawio.xml` against the
+implementation, as of the report-layout build.
 
-**Source:** 43 methods across 17 classes.
-**Split:** 17 methods belong to `Guru`, `TataUsaha` and `KepalaSekolah` — three
-persona classes that were deliberately **not** created, so their logic was
-redistributed onto domain models. The remaining **26** sit on real models and are
-audited below.
+**Source:** 25 methods across 14 classes.
+**Split:** the persona classes `Guru`, `TataUsaha` and `KepalaSekolah` were
+deliberately **not** created, so their behaviour lives on the domain models. Every
+method on a real model is audited below.
 
 | Bucket | Count |
 | --- | --- |
-| A. In diagram, not implemented | 12 |
-| B. Not in diagram, but needed | 7 |
-| C. In diagram, not used | 6 + 17 persona methods |
+| Implemented | 20 |
+| Deliberate stubs | 5 |
+| Missing | 0 |
 
 ---
 
-## A. In the diagram, not implemented
+## Implemented (20)
 
-### A1. Stubs that break a shipped screen
+| Class | Method | Notes |
+| --- | --- | --- |
+| `Role` | `getHakAkses(): array` | Backs `punyaHakAkses()` and the `hak` route middleware |
+| `User` | `login(email, password): bool` | Verifies credentials, then `Auth::login` |
+| `User` | `logout(): void` | Ends the session, invalidates it, rotates CSRF |
+| `User` | `ubahPassword(password): void` | Called from the profile screen |
+| `Kelas` | `getDaftarRapor(?Semester)` | Relation-backed accessor |
+| `Rapor` | `ajukanPersetujuan(): void` | Draft → waiting approval |
+| `Rapor` | `setujui(user): void` | Approves and finalises written narratives |
+| `Rapor` | `kembalikanRevisi(catatan): void` | Returns with a revision note |
+| `TahunAjaran` | `gantiSemester(): void` | Flips the active term and opens drafts |
+| `Siswa` | `getRiwayatRapor()` | Relation-backed accessor |
+| `ProgramPengembangan` | `getIndikator(?Semester)` | Relation-backed accessor |
+| `IndikatorCapaian` | `salinIndikator(Semester): void` | Copies a term forward, idempotently |
+| `NilaiSiswa` | `isiNilai(nilai): void` | Sets the level |
+| `NilaiSiswa` | `tandaiUntukNarasi(): void` | Flags the row for the narrative |
+| `MataPelajaran` | `getProgram()` | Relation-backed accessor |
+| `Narasi` | `simpanDraft(teks): void` | Saves the draft text |
+| `Narasi` | `simpanNarasiFinal(teks): void` | Saves the final text |
+| `Dokumentasi` | `unggahFoto(file): void` | Stores the file, honours `MAKS_FOTO` |
+| `Dokumentasi` | `hapusFoto(): void` | Deletes the file and the row |
+| `Pembelajaran` | `getGuru(): User` | Relation-backed accessor |
 
-These are the ones a reviewer will click on. The screens render completely, but
-the control does nothing.
+Covered by `tests/Feature/DiagramAccessorsTest.php`, `SalinIndikatorTest.php`,
+`GantiSemesterTest.php`, `SetujuiRaporTest.php`, `LogoutTest.php`,
+`UbahPasswordTest.php` and `DokumentasiTest.php`.
 
-- [ ] **`Dokumentasi::unggahFoto(UploadedFile $file): void`** — empty body.
-      Screen 04's "Unggah" slot accepts no photo.
-- [ ] **`Dokumentasi::hapusFoto(): void`** — empty body. The photo delete (×) on
-      screen 04 does nothing.
-- [ ] **`Narasi::susunPrompt(): string`** — returns `''`. Feeds the prompt builder.
-- [ ] **`GeminiApi::kirimPrompt(string $prompt): string`** — returns `''`. Screen
-      04's "Generate Narasi" reports that AI is unconfigured.
-      *Diagram gives no provider, model, key or failure contract — needs a spec
-      before it can be built.*
-- [ ] **`Rapor::eksporPDF(): string`** — returns `''`. Screen 06's "Export PDF"
-      does nothing. `barryvdh/laravel-dompdf` is already installed, so this is the
-      cheapest of the five.
-- [x] **`IndikatorCapaian::salinIndikator(Semester $semester): void`** —
-      implemented as a per-indicator copy that keeps `Program_ID`, `Jenjang`,
-      `Tipe` and the school year, changes the semester, and takes a fresh
-      `Kode_KD`. It skips indicators that already exist in the target semester,
-      so running it twice is safe. The screen 05 action copies the previous term
-      forward into the active semester, honouring the mapel/jenjang/tipe filters,
-      and reports how many were added. Covered by
-      `tests/Feature/SalinIndikatorTest.php` (7 tests) and verified in the
-      browser.
-- [x] **`TahunAjaran::gantiSemester(): int`** — implemented. Flips
-      `Semester_Aktif` and opens a `BelumDiisi` draft for every already-placed
-      student, keeping each in the class from their most recent report. Students
-      who have never been placed are skipped, because a report needs a class;
-      they are handled by Penempatan Siswa. Returns the number of drafts created,
-      which the dashboard reports. Covered by `tests/Feature/GantiSemesterTest.php`
-      (8 tests) and verified live: semester flipped to Genap, 7 ganjil reports
-      preserved, 7 new `belum_diisi` drafts created.
-
-### A2. Stubs with no screen depending on them
-
-- [x] **`Role::getHakAkses(): array`** — implemented as the capability map that
-      now backs B1. `punyaHakAkses()` was added alongside it.
-- [x] **`User::logout(): void`** — implemented: ends the session for that user,
-      invalidates it so a fixated session id cannot survive, and rotates the CSRF
-      token. The logout route now calls it instead of inlining the calls, so the
-      method is live code for the interface's logout button to use. Covered by
-      `tests/Feature/LogoutTest.php` (8 tests) and verified in the browser.
-- [x] **`User::login(string $email, string $password): bool`** — **removed.** It
-      returned `false` unconditionally and nothing called it (the login screen
-      uses `Auth::attempt`), so it was a method that could only fail. **The class
-      diagram still lists it and should drop it** — see C3.
-- [ ] **`User::ubahPassword(string $password): void`** — empty body. No profile
-      screen exists (see B5).
-- [ ] **`TahunAjaran::aktifkan(): void`** — empty body. No screen sets the active
-      year; the seeder does it directly.
-
----
-
-## B. Not in the diagram, but needed
-
-- [x] **B1. Authorization enforcement — CLOSED.**
-      `Role::getHakAkses()` now returns a capability map, `Role::punyaHakAkses()`
-      checks it (`*` is the administrator wildcard), and
-      `App\Http\Middleware\EnsureHakAkses` (aliased `hak`) guards each route with
-      `['auth', 'hak:<capability>']`. Capability keys double as sidebar entry keys,
-      so the menu and the guard read one vocabulary.
-
-      Verified over real HTTP — the matrix is now strict:
-
-      | Route | Guru | Tata Usaha | Kepala Sekolah |
-      | --- | --- | --- | --- |
-      | `/rapor`, `/indikator` | 200 | 403 | 403 |
-      | `/siswa`, `/penempatan`, `/dashboard/tata-usaha` | 403 | 200 | 403 |
-      | `/review-rapor`, `/dashboard/progres` | 403 | 403 | 200 |
-      | `/dashboard` (role dispatcher) | 200 | 200 | 200 |
-
-      Covered by `tests/Feature/AuthorizationTest.php` (26 tests).
-- [ ] **B2. Student placement (screen 09).** No diagram method exists. Built
-      inline as `Rapor::updateOrCreate`, which is the behaviour the design
-      describes but the diagram never asked for.
-- [ ] **B3. Tata Usaha dashboard computation (screen 07).** The "Perlu
-      Dikerjakan" panel — unplaced students, classes without a homeroom teacher,
-      subjects without an assigned teacher — has no method. The only progress
-      method, `pantauProgresRapor()`, is on `KepalaSekolah`.
-- [ ] **B4. Student CRUD and Excel import (screen 08).**
-      `TataUsaha::kelolaDataSiswa(): void` carries no validation, return shape or
-      import behaviour. "Import Excel" and "Tambah Siswa" are both placeholder
-      flashes.
-- [ ] **B5. Student detail and history (screen 08).** "Detail / Ubah" is a dead
-      button, and `Siswa::getRiwayatRapor()` has no screen to serve.
-- [x] **B6. Narrative finalisation on approval — closed.**
-      `Rapor::setujui()` now promotes every written narrative to final, so the
-      rule holds for any caller rather than only the review screen. Narratives
-      with no text are deliberately left as drafts: there is nothing to finalise,
-      and marking an empty one final would hide the gap. Narratives already final
-      are left untouched, timestamp included. Covered by
-      `tests/Feature/SetujuiRaporTest.php` (8 tests) and verified in the browser:
-      approving a report moved all three of its narratives from `draft` to `final`.
-- [x] **B7. Photo cap and indicator ordering — both closed.**
-      The 1–3 photo cap is now a model invariant (`Dokumentasi::MAKS_FOTO`).
-      Indicator ordering turned out to share a root cause with the copy work:
-      `IndikatorCapaianFactory` set `Kode_KD` to `fake()->unique()->bothify('KD-##?')`,
-      which filled the column with random values like `KD-42r`. Because
-      `Kode_KD` is derived from `Indikator_ID` in a `creating` hook, a non-blank
-      factory value suppressed the derivation, so `orderBy('Kode_KD')` sorted
-      randomly and screen 04 rendered indicators shuffled. Removing `Kode_KD`
-      from the factory makes the model derive it, giving `KD-2600001…5` in
-      insertion order — which also happens to be the order the design shows.
-
----
-
-## C. Settled against the master copy
-
-Four earlier divergences were closed rather than recorded:
-
-| Item | Resolution |
-| --- | --- |
-| `Rapor::hitungProgres()` | Removed by decision; the master copy already omits it |
-| `Pembelajaran::getGuru(): Guru` | Retyped to `User` in code; the master copy already reflects it |
-| 5 accessors typed `: list` | Equivalent to `Collection`; the master copy will be updated |
-| `TahunAjaran::gantiSemester(): void` | Restored to the diagram's signature; the dashboard measures the draft count itself |
-| `User::login(email, password): bool` | Reinstated and implemented — verifies the credentials then signs in |
-
-`User::login()` is the diagram's signature working as intended. The login screen
-still uses `Auth::attempt`, because it has no `User` instance to call the method
-on; the method is available to anything that does.
-
-### C1. Accessor methods — implemented
-
-`Siswa::getRiwayatRapor()`, `Kelas::getDaftarRapor(?Semester)`,
-`MataPelajaran::getProgram()`, `ProgramPengembangan::getIndikator(?Semester)` and
-`Pembelajaran::getGuru()` are real methods over the relations they summarise.
-Covered by `tests/Feature/DiagramAccessorsTest.php`.
-
-### C2. Nothing in the diagram is missing
-
-All 26 methods declared on real models now exist. The ERD needed no edits: it
-records column types only, with no enum value sets and no nullability markers, so
-the `Jenjang` reformat, the `BelumDiisi` state and the nullable homeroom teacher
-could not have drifted it.
-
-## What still is not aligned
-
-**21 of 43 implemented. The 22 outstanding, in full:**
-
-### 17 persona methods — behaviour exists, location differs
-
-`Guru`, `TataUsaha` and `KepalaSekolah` were not created, so their methods sit on
-the domain models. Nothing is missing behaviourally:
-
-| Diagram | Implemented as |
-| --- | --- |
-| `Guru::isiNilaiIndikator` | `NilaiSiswa::isiNilai()` |
-| `Guru::isiCatatanPersonal` | `Narasi::isiCatatanPersonal()` |
-| `Guru::editNarasi` | `Narasi::editNarasi()` |
-| `Guru::generateNarasi` | `GeminiApi::kirimPrompt()` + `Narasi::susunPrompt()` |
-| `Guru::unggahDokumentasi` | `Dokumentasi::unggahFoto()` |
-| `Guru::ajukanRapor` | `Rapor::ajukanPersetujuan()` |
-| `Guru::eksporRaporPDF` | `Rapor::eksporPDF()` |
-| `KepalaSekolah::setujuiRapor` | `Rapor::setujui()` |
-| `KepalaSekolah::kirimCatatanRevisi` | `Rapor::kembalikanRevisi()` |
-| `KepalaSekolah::reviewDrafRapor` | `Rapor::reviewDrafRapor()` |
-| `KepalaSekolah::pantauProgresRapor` | none — screen 10 queries directly |
-| `TataUsaha::*` (6) | none — see B2, B3, B4 |
-
-`pantauProgresRapor()` and the six `TataUsaha` methods are the only ones with no
-implementation anywhere.
-
-### 5 stubs, all deliberate
+## Deliberate stubs (5)
 
 | Method | State | Why it waits |
 | --- | --- | --- |
-| `Rapor::eksporPDF()` | `return ''` | deferred by request; dompdf is installed |
-| `GeminiApi::kirimPrompt()` | `return ''` | deferred; the diagram gives no provider or key contract |
-| `Narasi::susunPrompt()` | `return ''` | deferred; feeds the above |
-| `TahunAjaran::aktifkan()` | `//` | no screen sets the active year |
-| `User::ubahPassword()` | `//` | no profile screen |
+| `Rapor::eksporPDF(): string` | `return ''` | Deferred by request until the layout is agreed. dompdf is installed; the on-screen layout now matches `docs/contoh-rapor.pdf`, so this is the next step. |
+| `GeminiApi::kirimPrompt(prompt): string` | `return ''` | The diagram gives no provider, model, key or failure contract |
+| `Narasi::susunPrompt(): string` | `return ''` | Feeds the method above |
+| `TahunAjaran::aktifkan(): void` | empty | No screen sets the active year |
+| `Kelas::hitungProgres(): int` | empty | Removed from the master diagram; the dashboard counts drafts itself |
 
-The last two need screens rather than implementations — they have nowhere to be
-called from.
+## Additions beyond the diagram
 
-## Progress
+Recorded here because the class diagram does not carry them.
 
-1. ~~**B1 authorization**~~ — **done** (26 tests, verified over HTTP).
-2. ~~**A1 file handling**~~ — **done** (6 tests, verified in the browser; the
-   1–3 cap is a model invariant, and the component no longer puts an
-   `UploadedFile` into the `Foto` column).
-3. ~~**A1 `gantiSemester`**~~ — **done** (8 tests, verified live).
-4. ~~**A1 `salinIndikator`**~~ — **done** (7 tests, verified in the browser);
-   it also uncovered and fixed the B7 ordering bug.
-5. ~~**A2 `User::logout` / `User::login`**~~ — **done**: `logout()` implemented and
-   wired to the route, `login()` deleted. The interface still has no logout
-   button; when it arrives it can simply post to the existing route.
-6. **C1–C3** — update the diagram so it matches the code, then re-audit. Removing
-   `User::login` is part of this.
+### Accessor methods
 
-Deferred by request: `Rapor::eksporPDF()` (A1) and the AI narrative pair
-(`Narasi::susunPrompt` / `GeminiApi::kirimPrompt`).
+`Siswa::belumDitempatkan()`, `Kelas::denganProgres()`,
+`Pembelajaran::tugaskan()` and `Rapor::pempatkan()` fill gaps the screens need
+which the diagram does not name. They sit on the classes whose data they shape.
+
+### Role rows
+
+The diagram models one `Role` class with no teacher sub-roles. Two role rows now
+exist for teachers, because the export scope differs:
+
+| Role | Binding | Produces |
+| --- | --- | --- |
+| `GURUWALI` | `Kelas.User_ID` (one class) | The full report book |
+| `GURU` | `Pembelajaran.User_ID` (all classes they teach) | Their own subject page |
+
+The binding already existed in the ERD — `Kelas.User_ID` marks the homeroom
+teacher and `Pembelajaran.User_ID` the subject teacher. Only the `Role` row is
+new, so the application can tell the two apart for menus and exports.
+
+### Row-level capabilities
+
+`dashboard.guru` is redundant now that `/dashboard` dispatches on role, and
+`persetujuan` duplicates `review` on the same route. Both are dead weight.
+
+### `ADMIN` has no sidebar or dashboard branch
+
+`/dashboard` renders an empty sidebar for `ADMIN`, because the role dispatcher's
+`match` has no `ADMIN` arm. Administrators can still reach every guarded route via
+the wildcard capability.
+
+## Export layout notes
+
+The on-screen preview now reproduces `docs/contoh-rapor.pdf`; `eksporPDF()` will
+reuse the same three partials (`identitas`, `seksi-prosa`, `seksi-tabel`,
+`penutup`).
+
+Two gaps remain for a faithful PDF:
+
+- **CJK fonts.** The `Bahasa Mandarin` page contains Chinese. dompdf's default
+  Helvetica stack has no coverage, so a CJK-capable TTF must be bundled.
+- **Parent reflection.** The two free-text boxes are a printed form for
+  handwriting, so they render empty and need no storage.
+
+One ERD limitation shows in the output: `Rapor` stores a single
+`Status_Pertumbuhan`, but the reference prints a growth status beside each of
+tinggi, berat and lingkar kepala. The same stored value is printed three times.
+
+## Settled against the master copy
+
+| Item | Resolution |
+| --- | --- |
+| `Rapor::hitungProgres()` | Removed; the master copy already omits it |
+| `Pembelajaran::getGuru(): Guru` | Retyped to `User`; the master copy reflects it |
+| `TahunAjaran::gantiSemester(): void` | Restored to the diagram's signature; the dashboard measures the draft count itself |
+| Persona classes | Not created; behaviour redistributed onto domain models |

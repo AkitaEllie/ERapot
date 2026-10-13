@@ -170,6 +170,7 @@ class User extends Authenticatable
      */
     public function ubahPassword(string $password): void
     {
-        //
+        // The Password attribute is cast to "hashed", so it hashes on assignment.
+        $this->forceFill(['Password' => $password])->save();
     }
 }

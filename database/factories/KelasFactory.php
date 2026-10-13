@@ -23,7 +23,8 @@ class KelasFactory extends Factory
             'User_ID' => User::factory(),
             'Nama_Kelas' => fake()->unique()->bothify('??-?#'),
             'Jenjang' => fake()->randomElement(Jenjang::cases()),
-            'Fase' => fake()->randomElement(['A', 'B', 'C', 'D', 'E', 'F']),
+            // PAUD uses a single fase, "Pondasi", whatever the jenjang.
+            'Fase' => 'Pondasi',
         ];
     }
 }

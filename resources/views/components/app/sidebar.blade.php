@@ -2,7 +2,7 @@
     use App\Models\User;
 
     $menu = match (auth()->user()?->Role_ID) {
-        'GURU' => [
+        'GURU', 'GURUWALI' => [
             ['key' => 'dashboard', 'label' => 'Dashboard', 'icon' => 'home'],
             ['key' => 'indikator', 'label' => 'Indikator Penilaian', 'icon' => 'checklist'],
             ['key' => 'rapor', 'label' => 'Rapor Siswa', 'icon' => 'document'],
@@ -28,6 +28,7 @@
 
     $roleLabel = match (auth()->user()?->Role_ID) {
         'GURU' => 'GURU',
+        'GURUWALI' => 'GURU WALI KELAS',
         'TATAUSA' => 'TATA USAHA',
         'KEPSEKOL' => 'KEPALA SEKOLAH',
         'ADMIN' => 'ADMINISTRATOR',
@@ -45,6 +46,12 @@
         'penempatan' => fn (): string => route('penempatan'),
         'review' => fn (): string => route('review-rapor'),
         'persetujuan' => fn (): string => route('review-rapor'),
+        'ekspor' => fn (): string => route('ekspor-rapor'),
+        'tahun-ajaran' => fn (): string => route('tahun-ajaran'),
+        'pengguna' => fn (): string => route('pengguna'),
+        'kelas' => fn (): string => route('kelas'),
+        'mapel' => fn (): string => route('mapel'),
+        'penugasan' => fn (): string => route('penugasan-mengajar'),
     ];
 
     $icons = [
