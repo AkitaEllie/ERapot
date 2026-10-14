@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\RaporDownloadController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Route;
@@ -45,6 +46,12 @@ Route::livewire('/rapor', 'pages::rapor-list')
 // Declared before the catch-all below, otherwise {mapel} would swallow "pratinjau".
 Route::livewire('/rapor/{rapor}/pratinjau', 'pages::rapor-preview')
     ->name('rapor.pratinjau')
+    ->middleware(['auth', 'hak:ekspor']);
+
+// Also before the catch-all. Streams the exported file, exporting on demand when
+// the stored copy is missing so a download link never 404s.
+Route::get('/rapor/{rapor}/unduh', RaporDownloadController::class)
+    ->name('rapor.unduh')
     ->middleware(['auth', 'hak:ekspor']);
 
 Route::livewire('/rapor/{rapor}/{mapel}', 'pages::rapor-input')

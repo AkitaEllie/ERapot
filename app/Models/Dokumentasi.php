@@ -44,6 +44,25 @@ class Dokumentasi extends Model
     public const MAKS_FOTO = 3;
 
     /**
+     * The photo as an absolute URL the browser can load.
+     */
+    public function url(): string
+    {
+        return Storage::disk('public')->url($this->Foto);
+    }
+
+    /**
+     * The photo as an absolute filesystem path, for renderers that read from disk.
+     *
+     * dompdf cannot resolve the app's relative URLs, so the export needs the real
+     * path rather than a web URL.
+     */
+    public function berkasAbsolut(): string
+    {
+        return Storage::disk('public')->path($this->Foto);
+    }
+
+    /**
      * Attach a photo to this record and store the file on the public disk.
      */
     public function unggahFoto(UploadedFile $file): void

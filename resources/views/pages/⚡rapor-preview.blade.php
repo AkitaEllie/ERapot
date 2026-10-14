@@ -2,9 +2,6 @@
 
 use App\Enums\JenisMataPelajaran;
 use App\Enums\RaporStatus;
-use App\Enums\StatusNarasi;
-use App\Models\MataPelajaran;
-use App\Models\Narasi;
 use App\Models\Pembelajaran;
 use App\Models\Rapor;
 use Illuminate\Support\Collection;
@@ -21,6 +18,12 @@ class extends \Livewire\Component
         session()->flash('galat', 'Cetak belum diimplementasikan.');
     }
 
+    /**
+     * Export the report and hand the file to the browser.
+     *
+     * The file is produced first so a failure surfaces here rather than as a
+     * broken download, then the browser is sent to the route that streams it.
+     */
     public function exportPdf(): void
     {
         if ($this->rapor->Status !== RaporStatus::Disetujui) {
@@ -29,8 +32,9 @@ class extends \Livewire\Component
             return;
         }
 
-        // Not on ERD/CD: PDF generation is a stub until Rapor::eksporPDF() is implemented.
-        session()->flash('galat', 'Export PDF belum diimplementasikan.');
+        $this->rapor->eksporPDF();
+
+        $this->redirect(route('rapor.unduh', $this->rapor), navigate: false);
     }
 
     /**
@@ -48,38 +52,30 @@ class extends \Livewire\Component
     }
 
     /**
-     * The subjects this report should show.
+     * The report's subject groups, narrowed to what this viewer may see.
      *
-     * The homeroom teacher gets every subject; a subject teacher gets only the
-     * subjects they are assigned to teach in this class.
-     *
-     * @return Collection<int, array{mapel: MataPelajaran, narasi: ?Narasi, pengampu: ?\App\Models\User}>
+     * @return array{intrakurikuler: Collection<int, array{mapel: \App\Models\MataPelajaran, narasi: ?\App\Models\Narasi, pengampu: ?\App\Models\User}>, kokurikuler: Collection<int, array{mapel: \App\Models\MataPelajaran, narasi: ?\App\Models\Narasi, pengampu: ?\App\Models\User}>, tabel: Collection<int, array{mapel: \App\Models\MataPelajaran, narasi: ?\App\Models\Narasi, pengampu: ?\App\Models\User}>}
      */
     #[Computed]
-    public function bagian(): Collection
+    public function seksi(): array
     {
-        $narasi = $this->rapor->narasi()
-            ->with(['nilaiSiswa', 'dokumentasi', 'mataPelajaran'])
-            ->get()
-            ->keyBy('Mapel_ID');
+        $seksi = $this->rapor->seksi();
 
-        $pengampu = Pembelajaran::query()
-            ->where('Kelas_ID', $this->rapor->Kelas_ID)
-            ->with('guru')
-            ->get()
-            ->keyBy('Mapel_ID');
+        if ($this->waliKelas) {
+            return $seksi;
+        }
 
-        return MataPelajaran::query()
-            ->whereIn('Mapel_ID', $pengampu->keys())
-            ->where('Tampilkan_Indikator', true)
-            ->when(! $this->waliKelas, fn ($query) => $query->whereIn('Mapel_ID', $this->mapelDiajarIds()))
-            ->orderBy('Nama_Mapel')
-            ->get()
-            ->map(fn (MataPelajaran $mapel): array => [
-                'mapel' => $mapel,
-                'narasi' => $narasi->get($mapel->getKey()),
-                'pengampu' => $pengampu->get($mapel->getKey())?->guru,
-            ]);
+        $diampu = $this->mapelDiajarIds();
+
+        $hanya = fn (Collection $items): Collection => $items
+            ->filter(fn (array $b): bool => in_array($b['mapel']->getKey(), $diampu, true))
+            ->values();
+
+        return [
+            'intrakurikuler' => $hanya($seksi['intrakurikuler']),
+            'kokurikuler' => $hanya($seksi['kokurikuler']),
+            'tabel' => $hanya($seksi['tabel']),
+        ];
     }
 
     /**
@@ -96,20 +92,19 @@ class extends \Livewire\Component
             ->all();
     }
 
-    /** @return Collection<int, array{mapel: MataPelajaran, narasi: ?Narasi, pengampu: ?\App\Models\User}> */
-    public function seksiA(): Collection
+    /**
+     * Whether the viewer sees anything at all. A subject teacher with no
+     * assignment in this class gets an empty document rather than a misleading one.
+     */
+    #[Computed]
+    public function adaIsi(): bool
     {
-        return $this->bagian->filter(fn (array $b): bool => $b['mapel']->Jenis_Mapel === JenisMataPelajaran::Intrakurikuler)->values();
-    }
+        $seksi = $this->seksi;
 
-    public function seksiB(): Collection
-    {
-        return $this->bagian->filter(fn (array $b): bool => $b['mapel']->Jenis_Mapel === JenisMataPelajaran::KoKurikuler)->values();
-    }
-
-    public function halamanTabel(): Collection
-    {
-        return $this->bagian->filter(fn (array $b): bool => $b['mapel']->Jenis_Mapel === JenisMataPelajaran::MuatanLokal)->values();
+        return $this->waliKelas
+            || $seksi['intrakurikuler']->isNotEmpty()
+            || $seksi['kokurikuler']->isNotEmpty()
+            || $seksi['tabel']->isNotEmpty();
     }
 
     /**
@@ -151,49 +146,21 @@ class extends \Livewire\Component
     @endif
 
     <div class="flex-1 overflow-y-auto bg-canvas px-8 py-6">
-        {{-- Rendered at A4 proportions so the preview matches the exported file. --}}
-        <article class="rapor-dokumen mx-auto w-[794px] bg-white px-[56px] py-[56px] text-[13px] leading-relaxed text-[#111] shadow-sm ring-1 ring-hairline">
-            <x-rapor.gaya />
-
-            @if ($this->waliKelas)
-                {{-- The homeroom teacher owns the whole book, as in contoh-rapor.pdf. --}}
-                @include('components.rapor.identitas', ['rapor' => $rapor])
-
-                {{-- A. INTRAKURIKULER --}}
-                @if ($this->seksiA()->isNotEmpty())
-                    <h2 class="mt-6 mb-3 font-bold">A. INTRAKURIKULER</h2>
-                    @foreach ($this->seksiA() as $item)
-                        <x-rapor.seksi-prosa :narasi="$item['narasi']" :mapel="$item['mapel']" />
-                    @endforeach
-                @endif
-
-                {{-- B. KOKURIKULER --}}
-                @if ($this->seksiB()->isNotEmpty())
-                    <h2 class="mt-8 mb-3 font-bold">B. KOKURIKULER</h2>
-                    @foreach ($this->seksiB() as $item)
-                        <x-rapor.seksi-prosa
-                            :narasi="$item['narasi']"
-                            :mapel="$item['mapel']"
-                            :judul="'Deskripsi Pengembangan Proyek ('.$item['mapel']->Nama_Mapel.')'"
-                        />
-                    @endforeach
-                @endif
-
-                <x-rapor.penutup :rapor="$rapor" />
-            @endif
-
-            {{-- Table-template subjects, one page each. A subject teacher sees only
-                 the subject they are assigned to in this class. --}}
-            @foreach ($this->halamanTabel() as $item)
-                <div class="{{ $loop->first && ! $this->waliKelas ? '' : 'mt-12 border-t-2 border-dashed border-hairline pt-10' }}">
-                    <x-rapor.seksi-tabel
-                        :narasi="$item['narasi']"
-                        :mapel="$item['mapel']"
-                        :rapor="$rapor"
-                        :pengampu="$item['pengampu']"
-                    />
-                </div>
-            @endforeach
-        </article>
+        @if (! $this->adaIsi)
+            <p class="mx-auto w-[794px] bg-white px-[56px] py-[56px] text-center text-[14px] text-muted shadow-sm ring-1 ring-hairline">
+                Tidak ada mata pelajaran yang bisa Anda lihat pada rapor ini.
+            </p>
+        @else
+            {{-- Rendered at A4 proportions so the preview matches the exported file. --}}
+            <article class="mx-auto w-[794px] bg-white px-[56px] py-[56px] text-[13px] leading-relaxed text-[#111] shadow-sm ring-1 ring-hairline">
+                <x-rapor.dokumen
+                    :rapor="$rapor"
+                    :identitas="$this->waliKelas"
+                    :intrakurikuler="$this->seksi['intrakurikuler']"
+                    :kokurikuler="$this->seksi['kokurikuler']"
+                    :tabel="$this->seksi['tabel']"
+                />
+            </article>
+        @endif
     </div>
 </div>

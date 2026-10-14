@@ -10,13 +10,13 @@ method on a real model is audited below.
 
 | Bucket | Count |
 | --- | --- |
-| Implemented | 20 |
-| Deliberate stubs | 5 |
+| Implemented | 21 |
+| Deliberate stubs | 4 |
 | Missing | 0 |
 
 ---
 
-## Implemented (20)
+## Implemented (21)
 
 | Class | Method | Notes |
 | --- | --- | --- |
@@ -28,6 +28,7 @@ method on a real model is audited below.
 | `Rapor` | `ajukanPersetujuan(): void` | Draft → waiting approval |
 | `Rapor` | `setujui(user): void` | Approves and finalises written narratives |
 | `Rapor` | `kembalikanRevisi(catatan): void` | Returns with a revision note |
+| `Rapor` | `eksporPDF(): string` | Renders the document to PDF, stores it, returns the path |
 | `TahunAjaran` | `gantiSemester(): void` | Flips the active term and opens drafts |
 | `Siswa` | `getRiwayatRapor()` | Relation-backed accessor |
 | `ProgramPengembangan` | `getIndikator(?Semester)` | Relation-backed accessor |
@@ -43,13 +44,12 @@ method on a real model is audited below.
 
 Covered by `tests/Feature/DiagramAccessorsTest.php`, `SalinIndikatorTest.php`,
 `GantiSemesterTest.php`, `SetujuiRaporTest.php`, `LogoutTest.php`,
-`UbahPasswordTest.php` and `DokumentasiTest.php`.
+`UbahPasswordTest.php`, `DokumentasiTest.php` and `EksporRaporTest.php`.
 
-## Deliberate stubs (5)
+## Deliberate stubs (4)
 
 | Method | State | Why it waits |
 | --- | --- | --- |
-| `Rapor::eksporPDF(): string` | `return ''` | Deferred by request until the layout is agreed. dompdf is installed; the on-screen layout now matches `docs/contoh-rapor.pdf`, so this is the next step. |
 | `GeminiApi::kirimPrompt(prompt): string` | `return ''` | The diagram gives no provider, model, key or failure contract |
 | `Narasi::susunPrompt(): string` | `return ''` | Feeds the method above |
 | `TahunAjaran::aktifkan(): void` | empty | No screen sets the active year |
@@ -64,6 +64,26 @@ Recorded here because the class diagram does not carry them.
 `Siswa::belumDitempatkan()`, `Kelas::denganProgres()`,
 `Pembelajaran::tugaskan()` and `Rapor::pempatkan()` fill gaps the screens need
 which the diagram does not name. They sit on the classes whose data they shape.
+
+### Report document methods
+
+The diagram names `Rapor::eksporPDF()` but not the work around it, so three
+additions carry it:
+
+| Method | Why it exists |
+| --- | --- |
+| `Rapor::bagian(): Collection` | The document's subject list, shared by the preview and the export |
+| `Rapor::seksi(): array` | That list grouped into Section A, Section B and the table pages |
+| `Rapor::berkasPdf(): string` | Where the exported file lives, so the row and the disk agree |
+| `Dokumentasi::url()` / `berkasAbsolut()` | The browser needs a web URL, dompdf needs a filesystem path |
+
+`eksporPDF()` renders the report's **complete** document and takes no viewer, as
+the diagram declares. Which parts a teacher may download is the caller's concern:
+the preview component narrows the sections for a subject teacher, so one renderer
+serves both requirements.
+
+`RaporDownloadController` is also beyond the diagram. The diagram models producing
+the file but not delivering it, and that transport is HTTP's business.
 
 ### Role rows
 
@@ -90,22 +110,28 @@ new, so the application can tell the two apart for menus and exports.
 `match` has no `ADMIN` arm. Administrators can still reach every guarded route via
 the wildcard capability.
 
-## Export layout notes
+## Export notes
 
-The on-screen preview now reproduces `docs/contoh-rapor.pdf`; `eksporPDF()` will
-reuse the same three partials (`identitas`, `seksi-prosa`, `seksi-tabel`,
-`penutup`).
+`eksporPDF()` writes to `rapor/{Rapor_ID}.pdf` on the public disk and remembers
+the path in `Rapor.File_PDF`, so a repeat export overwrites the same file and the
+stored copy cannot drift from the report it came from.
 
-Two gaps remain for a faithful PDF:
+The document is shared with the preview: one view (`components/rapor/dokumen`)
+renders both, so they cannot disagree. The two targets differ in styling only —
+the browser uses the compiled Tailwind bundle, dompdf cannot see it, so the
+document's design is restated in `gaya-pdf.blade.php` as plain CSS and uses tables
+rather than flex or grid, which dompdf does not lay out.
 
-- **CJK fonts.** The `Bahasa Mandarin` page contains Chinese. dompdf's default
-  Helvetica stack has no coverage, so a CJK-capable TTF must be bundled.
+Two points where the export is not a faithful copy of the reference:
+
 - **Parent reflection.** The two free-text boxes are a printed form for
   handwriting, so they render empty and need no storage.
+- **Growth status.** `Rapor` stores a single `Status_Pertumbuhan`, but the
+  reference prints a growth status beside each of tinggi, berat and lingkar
+  kepala. The same stored value is printed three times.
 
-One ERD limitation shows in the output: `Rapor` stores a single
-`Status_Pertumbuhan`, but the reference prints a growth status beside each of
-tinggi, berat and lingkar kepala. The same stored value is printed three times.
+Exported reports are ~6 MB because dompdf must embed the whole CJK font; see
+`storage/fonts/README.md` for why it cannot be subsetted further.
 
 ## Settled against the master copy
 

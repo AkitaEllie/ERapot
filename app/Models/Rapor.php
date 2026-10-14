@@ -2,11 +2,13 @@
 
 namespace App\Models;
 
+use App\Enums\JenisMataPelajaran;
 use App\Enums\RaporStatus;
 use App\Enums\Semester;
 use App\Enums\StatusNarasi;
 use App\Models\Concerns\HasShortSequenceKey;
 use Database\Factories\RaporFactory;
+use Dompdf\Dompdf;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Scope;
 use Illuminate\Database\Eloquent\Builder;
@@ -15,6 +17,8 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Storage;
 
 /**
  * @property string $Rapor_ID
@@ -45,6 +49,11 @@ class Rapor extends Model
 {
     /** @use HasFactory<RaporFactory> */
     use HasFactory, HasShortSequenceKey;
+
+    /**
+     * The disk exported report files are written to.
+     */
+    public const DISK_PDF = 'public';
 
     protected $primaryKey = 'Rapor_ID';
 
@@ -222,14 +231,118 @@ class Rapor extends Model
         //
     }
 
+    // Not on ERD/CD: the report document's subject grouping, shared by the
+    // preview screen and the PDF export so both render the same content.
+
     /**
-     * Render this report card to a PDF and return its path.
+     * Every subject on this report, grouped the way the document lays it out.
      *
-     * @todo Implement per the class diagram.
+     * Jenis_Mapel decides both the section and the page template: intrakurikuler
+     * is Section A, kokurikuler is Section B, and muatan_lokal gets its own
+     * indicator-table page. Subjects the school marks as not carrying indicators
+     * are data buckets rather than subjects, so they are left out.
+     *
+     * @return Collection<int, array{mapel: MataPelajaran, narasi: ?Narasi, pengampu: ?User}>
+     */
+    public function bagian(): Collection
+    {
+        $narasi = $this->narasi()
+            ->with(['nilaiSiswa', 'dokumentasi', 'mataPelajaran'])
+            ->get()
+            ->keyBy('Mapel_ID');
+
+        $pengampu = Pembelajaran::query()
+            ->where('Kelas_ID', $this->Kelas_ID)
+            ->whereNotNull('User_ID')
+            ->with('guru')
+            ->get()
+            ->keyBy('Mapel_ID');
+
+        return $this->mataPelajaranRapor()
+            ->where('Tampilkan_Indikator', true)
+            ->orderBy('Nama_Mapel')
+            ->get()
+            ->map(fn (MataPelajaran $mapel): array => [
+                'mapel' => $mapel,
+                'narasi' => $narasi->get($mapel->getKey()),
+                'pengampu' => $pengampu->get($mapel->getKey())?->guru,
+            ]);
+    }
+
+    /**
+     * The report's subject sections, keyed by the document's grouping.
+     *
+     * @return array{intrakurikuler: Collection<int, array{mapel: MataPelajaran, narasi: ?Narasi, pengampu: ?User}>, kokurikuler: Collection<int, array{mapel: MataPelajaran, narasi: ?Narasi, pengampu: ?User}>, tabel: Collection<int, array{mapel: MataPelajaran, narasi: ?Narasi, pengampu: ?User}>}
+     */
+    public function seksi(): array
+    {
+        $bagian = $this->bagian();
+
+        return [
+            'intrakurikuler' => $bagian->filter(fn (array $b): bool => $b['mapel']->Jenis_Mapel === JenisMataPelajaran::Intrakurikuler)->values(),
+            'kokurikuler' => $bagian->filter(fn (array $b): bool => $b['mapel']->Jenis_Mapel === JenisMataPelajaran::KoKurikuler)->values(),
+            'tabel' => $bagian->filter(fn (array $b): bool => $b['mapel']->Jenis_Mapel === JenisMataPelajaran::MuatanLokal)->values(),
+        ];
+    }
+
+    /**
+     * Render this report card to a PDF and return its path on the public disk.
+     *
+     * Renders the complete document, which is what the homeroom teacher exports.
+     * Which parts a given viewer may see is the caller's concern: a subject
+     * teacher's page is this same renderer with the sections narrowed.
+     *
+     * The path is remembered on the row so a repeat export reuses the file and
+     * the stored PDF cannot drift from the report it was made from.
      */
     public function eksporPDF(): string
     {
-        return '';
+        $berkas = $this->berkasPdf();
+
+        Storage::disk(self::DISK_PDF)->put($berkas, $this->renderPdf());
+
+        $this->forceFill([
+            'File_PDF' => $berkas,
+            'Tanggal_Cetak' => now(),
+        ])->save();
+
+        return $berkas;
+    }
+
+    /**
+     * Where this report's PDF lives on the public disk.
+     */
+    public function berkasPdf(): string
+    {
+        return 'rapor/'.$this->getKey().'.pdf';
+    }
+
+    private function renderPdf(): string
+    {
+        $seksi = $this->seksi();
+
+        $html = view('components.rapor.dokumen', [
+            'rapor' => $this,
+            'identitas' => true,
+            'intrakurikuler' => $seksi['intrakurikuler'],
+            'kokurikuler' => $seksi['kokurikuler'],
+            'tabel' => $seksi['tabel'],
+            'untukPdf' => true,
+        ])->render();
+
+        $dompdf = new Dompdf([
+            // The report pulls its own font and images from disk.
+            'chroot' => base_path(),
+            'isRemoteEnabled' => true,
+            // dompdf's subsetter corrupts the CJK font; see storage/fonts/README.md.
+            'enable_font_subsetting' => false,
+        ]);
+
+        $dompdf->loadHtml($html);
+        $dompdf->setPaper('a4');
+        $dompdf->render();
+
+        return (string) $dompdf->output();
     }
 
     /**
