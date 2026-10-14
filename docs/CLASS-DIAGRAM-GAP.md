@@ -10,13 +10,13 @@ method on a real model is audited below.
 
 | Bucket | Count |
 | --- | --- |
-| Implemented | 21 |
-| Deliberate stubs | 4 |
+| Implemented | 23 |
+| Deliberate stubs | 2 |
 | Missing | 0 |
 
 ---
 
-## Implemented (21)
+## Implemented (23)
 
 | Class | Method | Notes |
 | --- | --- | --- |
@@ -36,28 +36,60 @@ method on a real model is audited below.
 | `NilaiSiswa` | `isiNilai(nilai): void` | Sets the level |
 | `NilaiSiswa` | `tandaiUntukNarasi(): void` | Flags the row for the narrative |
 | `MataPelajaran` | `getProgram()` | Relation-backed accessor |
+| `Narasi` | `susunPrompt(): string` | Builds the prompt from the chosen indicators and the teacher's note |
 | `Narasi` | `simpanDraft(teks): void` | Saves the draft text |
 | `Narasi` | `simpanNarasiFinal(teks): void` | Saves the final text |
+| `GeminiApi` | `kirimPrompt(prompt): string` | Delegates to the configured provider driver |
 | `Dokumentasi` | `unggahFoto(file): void` | Stores the file, honours `MAKS_FOTO` |
 | `Dokumentasi` | `hapusFoto(): void` | Deletes the file and the row |
 | `Pembelajaran` | `getGuru(): User` | Relation-backed accessor |
 
 Covered by `tests/Feature/DiagramAccessorsTest.php`, `SalinIndikatorTest.php`,
 `GantiSemesterTest.php`, `SetujuiRaporTest.php`, `LogoutTest.php`,
-`UbahPasswordTest.php`, `DokumentasiTest.php` and `EksporRaporTest.php`.
+`UbahPasswordTest.php`, `DokumentasiTest.php`, `EksporRaporTest.php`,
+`PenyediaNarasiTest.php` and `SusunPromptTest.php`.
 
-## Deliberate stubs (4)
+## Deliberate stubs (2)
 
 | Method | State | Why it waits |
 | --- | --- | --- |
-| `GeminiApi::kirimPrompt(prompt): string` | `return ''` | The diagram gives no provider, model, key or failure contract |
-| `Narasi::susunPrompt(): string` | `return ''` | Feeds the method above |
 | `TahunAjaran::aktifkan(): void` | empty | No screen sets the active year |
 | `Kelas::hitungProgres(): int` | empty | Removed from the master diagram; the dashboard counts drafts itself |
 
 ## Additions beyond the diagram
 
 Recorded here because the class diagram does not carry them.
+
+### Narration providers
+
+The diagram models one «service» `GeminiAPI` with `API_Key`, `Model_AI` and
+`kirimPrompt()`, which ties the application to a single vendor. The behaviour is
+the same whatever answers the prompt, so the vendor now sits behind a contract:
+
+| Piece | Role |
+| --- | --- |
+| `App\Contracts\PenyediaNarasi` | The contract: `kirimPrompt(prompt): string` and `nama()` |
+| `App\Services\Narasi\GeminiPenyedia` | Google's `generateContent` endpoint |
+| `App\Services\Narasi\OpenAiPenyedia` | The chat-completions shape |
+| `config/ai.php` | Which provider, and each one's key, model, base URL and timeout |
+
+The class keeps its diagram name and signature, so nothing calling `GeminiApi`
+changed; it now delegates to the configured driver. `API_Key` and `Model_AI`
+survive as configuration rather than literals.
+
+The OpenAI driver is not only for OpenAI: pointing `OPENAI_BASE_URL` at a host
+that speaks the same shape (Groq, Together, Ollama, vLLM) is enough to switch to
+it, which is why the second driver covers most alternatives for the price of one.
+
+Adding a provider is one class implementing the contract plus one config entry.
+
+### Narration failure handling
+
+The diagram gives no failure contract. An absent key, a rejected request or an
+empty answer now raises `App\Exceptions\NarasiTidakTersedia`, which carries a
+message naming the provider and, when the provider supplies one, its own error
+text. The screen shows it and invites the teacher to write the narrative by hand,
+rather than the stub's silent empty string.
 
 ### Accessor methods
 

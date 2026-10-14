@@ -116,11 +116,43 @@ class Narasi extends Model
     /**
      * Build the prompt sent to the narration service.
      *
-     * @todo Implement per the class diagram.
+     * The teacher marks the indicators they want narrated (Dipilih_Untuk_Narasi)
+     * and may add their own note; both are what the narrative should express, so
+     * both go into the prompt. Written in Indonesian because the narrative it
+     * produces is in Indonesian.
      */
     public function susunPrompt(): string
     {
-        return '';
+        $siswa = $this->rapor->siswa;
+        $mapel = $this->mataPelajaran;
+
+        $indikator = $this->nilaiSiswa()
+            ->where('Dipilih_Untuk_Narasi', true)
+            ->with('indikatorCapaian')
+            ->get()
+            ->map(fn (NilaiSiswa $nilai): ?string => $nilai->indikatorCapaian?->Deskripsi)
+            ->filter()
+            ->values();
+
+        $baris = [
+            'Anda menyusun narasi rapor untuk pendidikan anak usia dini.',
+            "Nama siswa: {$siswa->Nama}.",
+            "Mata pelajaran: {$mapel->Nama_Mapel}.",
+        ];
+
+        if ($indikator->isNotEmpty()) {
+            $baris[] = 'Capaian yang perlu diceritakan:';
+            $baris[] = $indikator->map(fn (string $d): string => '- '.$d)->implode("\n");
+        }
+
+        if (filled($this->Catatan_Guru)) {
+            $baris[] = 'Catatan dari guru: '.$this->Catatan_Guru;
+        }
+
+        $baris[] = 'Tulis satu paragraf narasi perkembangan siswa dalam bahasa Indonesia, '
+            .'menggunakan nama siswa, tanpa menyebut nilai angka, dan tanpa membuat daftar.';
+
+        return implode("\n", $baris);
     }
 
     /**

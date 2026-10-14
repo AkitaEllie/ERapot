@@ -2,6 +2,7 @@
 
 use App\Enums\Nilai;
 use App\Enums\StatusNarasi;
+use App\Exceptions\NarasiTidakTersedia;
 use App\Models\Dokumentasi;
 use App\Models\IndikatorCapaian;
 use App\Models\MataPelajaran;
@@ -136,11 +137,12 @@ class extends \Livewire\Component
             return;
         }
 
-        // Not on ERD/CD: the AI narrative service is a stub until the Gemini key is configured.
-        $hasil = app(GeminiApi::class)->kirimPrompt($narasi->susunPrompt());
-
-        if ($hasil === '') {
-            session()->flash('galat', 'Generate Narasi belum dikonfigurasi. Tulis narasi secara manual.');
+        try {
+            $hasil = app(GeminiApi::class)->kirimPrompt($narasi->susunPrompt());
+        } catch (NarasiTidakTersedia $e) {
+            // The provider is unconfigured or failed. Say why rather than leaving
+            // the teacher to guess, and let them write the narrative by hand.
+            session()->flash('galat', $e->getMessage());
 
             return;
         }
