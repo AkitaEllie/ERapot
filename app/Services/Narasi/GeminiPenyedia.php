@@ -21,7 +21,17 @@ class GeminiPenyedia extends PenyediaHttp
     {
         $balasan = $this->minta(fn () => $this->klien()->post(
             $this->alamat(),
-            ['contents' => [['parts' => [['text' => $prompt]]]]],
+            [
+                // Gemini carries the instructions in its own field rather than as
+                // a message. Keeping them identical on every call lets the API
+                // serve them from its cache.
+                'systemInstruction' => [
+                    'parts' => [['text' => InstruksiNarasi::SISTEM]],
+                ],
+                'contents' => [
+                    ['role' => 'user', 'parts' => [['text' => $prompt]]],
+                ],
+            ],
         ));
 
         $teks = $balasan->json('candidates.0.content.parts.0.text');
@@ -29,6 +39,8 @@ class GeminiPenyedia extends PenyediaHttp
         if (! is_string($teks)) {
             throw NarasiTidakTersedia::balasanKosong($this->nama());
         }
+
+        $this->catatPemakaian($balasan, 'usageMetadata');
 
         return $this->teksWajib($teks);
     }

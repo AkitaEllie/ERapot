@@ -8,6 +8,7 @@ use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\PendingRequest;
 use Illuminate\Http\Client\Response;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 
 /**
  * Shared plumbing for HTTP-backed narration providers: the configured key, the
@@ -120,5 +121,32 @@ abstract class PenyediaHttp implements PenyediaNarasi
         }
 
         return $teks;
+    }
+
+    /**
+     * Record what the request cost, including whether the provider served the
+     * instructions from cache.
+     *
+     * Logged rather than stored: it is there to answer "is the cache actually
+     * helping?", which cannot be assumed from the prompt alone. The two vendors
+     * report it in different shapes, so the caller names the usage field.
+     */
+    protected function catatPemakaian(Response $balasan, string $kunci = 'usage'): void
+    {
+        $pemakaian = $balasan->json($kunci);
+
+        if (! is_array($pemakaian)) {
+            return;
+        }
+
+        Log::debug('Pemakaian penyedia narasi', [
+            'penyedia' => $this->nama(),
+            'model' => $this->model(),
+            'prompt_tokens' => $pemakaian['prompt_tokens'] ?? $pemakaian['promptTokenCount'] ?? null,
+            'cached_tokens' => $pemakaian['prompt_tokens_details']['cached_tokens']
+                ?? $pemakaian['cachedContentTokenCount']
+                ?? null,
+            'completion_tokens' => $pemakaian['completion_tokens'] ?? $pemakaian['candidatesTokenCount'] ?? null,
+        ]);
     }
 }

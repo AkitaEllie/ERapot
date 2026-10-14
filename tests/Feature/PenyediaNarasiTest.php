@@ -4,6 +4,7 @@ use App\Contracts\PenyediaNarasi;
 use App\Exceptions\NarasiTidakTersedia;
 use App\Services\GeminiApi;
 use App\Services\Narasi\GeminiPenyedia;
+use App\Services\Narasi\InstruksiNarasi;
 use App\Services\Narasi\OpenAiPenyedia;
 use Illuminate\Support\Facades\Http;
 
@@ -37,7 +38,7 @@ it('menolak penyedia yang tidak dikenal', function (): void {
     expect(fn () => app(PenyediaNarasi::class))->toThrow(NarasiTidakTersedia::class);
 });
 
-it('mengirim prompt ke Gemini dan mengembalikan teks', function (): void {
+it('mengirim prompt ke Gemini dengan instruksi sistem terpisah', function (): void {
     pakaiPenyedia('gemini', ['base_url' => 'https://contoh.test']);
 
     Http::fake([
@@ -53,13 +54,17 @@ it('mengirim prompt ke Gemini dan mengembalikan teks', function (): void {
     expect($hasil)->toBe('Andini berkembang baik.');
 
     Http::assertSent(function ($request): bool {
+        $data = $request->data();
+
         return str_contains($request->url(), '/v1beta/models/model-uji:generateContent')
             && str_contains($request->url(), 'key=kunci-uji')
-            && $request->data() === ['contents' => [['parts' => [['text' => 'Ceritakan Andini']]]]];
+            // Gemini carries the instructions in its own field, not as a message.
+            && $data['systemInstruction']['parts'][0]['text'] === InstruksiNarasi::SISTEM
+            && $data['contents'] === [['role' => 'user', 'parts' => [['text' => 'Ceritakan Andini']]]];
     });
 });
 
-it('mengirim prompt ke penyedia bergaya OpenAI dan mengembalikan teks', function (): void {
+it('mengirim prompt ke penyedia bergaya OpenAI dengan instruksi sistem terpisah', function (): void {
     pakaiPenyedia('openai', ['base_url' => 'https://api.contoh.test/v1']);
 
     Http::fake([
@@ -73,12 +78,32 @@ it('mengirim prompt ke penyedia bergaya OpenAI dan mengembalikan teks', function
     expect($hasil)->toBe('Andini berkembang baik.');
 
     Http::assertSent(function ($request): bool {
+        $data = $request->data();
+
         return $request->url() === 'https://api.contoh.test/v1/chat/completions'
             && $request->hasHeader('Authorization', 'Bearer kunci-uji')
-            && $request->data() === [
-                'model' => 'model-uji',
-                'messages' => [['role' => 'user', 'content' => 'Ceritakan Andini']],
-            ];
+            && $data['model'] === 'model-uji'
+            && $data['messages'][0] === ['role' => 'system', 'content' => InstruksiNarasi::SISTEM]
+            && $data['messages'][1] === ['role' => 'user', 'content' => 'Ceritakan Andini'];
+    });
+});
+
+it('menempatkan instruksi sistem lebih dahulu agar awalan dapat di-cache', function (): void {
+    pakaiPenyedia('openai', ['base_url' => 'https://api.contoh.test/v1']);
+
+    Http::fake([
+        'api.contoh.test/*' => Http::response([
+            'choices' => [['message' => ['content' => 'Baik.']]],
+        ]),
+    ]);
+
+    app(GeminiApi::class)->kirimPrompt('halo');
+
+    Http::assertSent(function ($request): bool {
+        $messages = $request->data()['messages'];
+
+        return $messages[0]['role'] === 'system'
+            && $messages[array_key_last($messages)]['role'] === 'user';
     });
 });
 

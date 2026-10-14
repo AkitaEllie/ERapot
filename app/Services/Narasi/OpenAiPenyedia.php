@@ -25,6 +25,9 @@ class OpenAiPenyedia extends PenyediaHttp
             ->post($this->baseUrl().'/chat/completions', [
                 'model' => $this->model(),
                 'messages' => [
+                    // The same instructions on every call, so the prefix stays
+                    // stable and a provider can serve it from its prompt cache.
+                    ['role' => 'system', 'content' => InstruksiNarasi::SISTEM],
                     ['role' => 'user', 'content' => $prompt],
                 ],
             ]));
@@ -34,6 +37,8 @@ class OpenAiPenyedia extends PenyediaHttp
         if (! is_string($teks)) {
             throw NarasiTidakTersedia::balasanKosong($this->nama());
         }
+
+        $this->catatPemakaian($balasan);
 
         return $this->teksWajib($teks);
     }

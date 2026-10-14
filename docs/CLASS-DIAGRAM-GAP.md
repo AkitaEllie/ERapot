@@ -69,8 +69,10 @@ the same whatever answers the prompt, so the vendor now sits behind a contract:
 | Piece | Role |
 | --- | --- |
 | `App\Contracts\PenyediaNarasi` | The contract: `kirimPrompt(prompt): string` and `nama()` |
+| `App\Services\Narasi\PenyediaHttp` | Shared config, timeout and failure handling |
 | `App\Services\Narasi\GeminiPenyedia` | Google's `generateContent` endpoint |
 | `App\Services\Narasi\OpenAiPenyedia` | The chat-completions shape |
+| `App\Services\Narasi\InstruksiNarasi` | The standing instructions sent as the system message |
 | `config/ai.php` | Which provider, and each one's key, model, base URL and timeout |
 
 The class keeps its diagram name and signature, so nothing calling `GeminiApi`
@@ -83,6 +85,35 @@ it, which is why the second driver covers most alternatives for the price of one
 
 Adding a provider is one class implementing the contract plus one config entry.
 
+### The prompt is split, and the split is deliberate
+
+`Narasi::susunPrompt()` returns the **user** prompt: only the facts that differ
+between students (name, class, semester, subject, the selected indicators with
+their levels, the teacher's note), in a fixed section order.
+
+The **system** prompt is `InstruksiNarasi::SISTEM`: generic, identical on every
+call, and held in the driver rather than passed by the caller. Two reasons:
+
+1. It is not per-student, so it does not belong in the caller's data.
+2. A prefix that never changes is what a provider can cache.
+
+That second point is measured, not assumed. On the configured endpoint the same
+request reports `cached_tokens` rising to the full prompt on the second call:
+
+| Call | Prompt tokens | Cached |
+| --- | --- | --- |
+| 1 (cold) | 471 | 427 |
+| 2 | 471 | 471 |
+| 3 | 471 | 471 |
+
+`PenyediaHttp::catatPemakaian()` logs prompt, cached and completion tokens at
+debug level, so whether the cache is helping stays answerable.
+
+The system prompt is written in Indonesian, because the earlier English phrasing
+let English leak into the narration. Its length and structure rules follow the
+school's own report samples, and its worked example uses `[nama]` rather than a
+real name, which would otherwise teach the model to reuse that name.
+
 ### Narration failure handling
 
 The diagram gives no failure contract. An absent key, a rejected request or an
@@ -90,6 +121,13 @@ empty answer now raises `App\Exceptions\NarasiTidakTersedia`, which carries a
 message naming the provider and, when the provider supplies one, its own error
 text. The screen shows it and invites the teacher to write the narrative by hand,
 rather than the stub's silent empty string.
+
+### Model pinning
+
+`AI_PROVIDER`'s sibling setting `OPENAI_MODEL` is pinned to a concrete model
+rather than an endpoint's router alias. A router alias (`kenari-free`) answered
+from a different model on each call, which showed up as an unpredictable latency
+spread (2.6s to 68s) and inconsistent narration quality.
 
 ### Accessor methods
 

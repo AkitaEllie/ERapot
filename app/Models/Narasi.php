@@ -114,60 +114,56 @@ class Narasi extends Model
     }
 
     /**
-     * Build the prompt sent to the narration service.
+     * Build the per-student prompt sent to the narration service.
      *
-     * The teacher marks the indicators they want narrated (Dipilih_Untuk_Narasi)
-     * and may add their own note; both are what the narrative should express, so
-     * both go into the prompt. Written in Indonesian because the narrative it
-     * produces is in Indonesian.
-     *
-     * The length and shape instructions follow the school's own report samples:
-     * an opening about how the child took part, several sentences of concrete
-     * observations, then a forward-looking hope. Without them the model returns a
-     * single thin sentence, which is not what the printed report looks like.
+     * Only what differs between students goes here; the standing instructions live
+     * in InstruksiNarasi and travel as the system message. The sections are in a
+     * fixed order so the prompt's prefix stays identical across calls, which is
+     * what lets a provider serve it from cache.
      */
     public function susunPrompt(): string
     {
-        $siswa = $this->rapor->siswa;
+        $rapor = $this->rapor;
+        $siswa = $rapor->siswa;
         $mapel = $this->mataPelajaran;
 
         $nilai = $this->nilaiSiswa()
             ->where('Dipilih_Untuk_Narasi', true)
-            ->with('indikatorCapaian')
+            ->with(['indikatorCapaian'])
             ->get();
 
-        $indikator = $nilai
-            ->map(fn (NilaiSiswa $n): ?string => $n->indikatorCapaian?->Deskripsi)
-            ->filter()
-            ->values();
-
         $baris = [
-            'Anda adalah guru taman kanak-kanak yang menyusun narasi rapor.',
-            "Nama siswa: {$siswa->Nama}.",
-            "Mata pelajaran: {$mapel->Nama_Mapel}.",
+            'DATA PESERTA DIDIK',
+            'Nama: '.$siswa->Nama,
+            'Kelas: '.$rapor->kelas->Nama_Kelas,
+            'Semester: '.$rapor->Semester->label(),
+            'Mata pelajaran: '.$mapel->Nama_Mapel,
         ];
 
-        if ($indikator->isNotEmpty()) {
-            $baris[] = 'Capaian yang perlu diceritakan:';
-            $baris[] = $indikator->map(fn (string $d): string => '- '.$d)->implode("\n");
+        if ($nilai->isNotEmpty()) {
+            $baris[] = '';
+            $baris[] = 'CAPAIAN YANG DICERITAKAN';
+            $baris[] = 'Kode di dalam kurung hanya penanda tingkat untuk Anda, jangan ditulis ulang.';
+
+            foreach ($nilai as $n) {
+                $deskripsi = $n->indikatorCapaian?->Deskripsi;
+
+                if (blank($deskripsi)) {
+                    continue;
+                }
+
+                $baris[] = sprintf('- %s (%s)', $deskripsi, $n->Nilai->value);
+            }
         }
 
         if (filled($this->Catatan_Guru)) {
-            $baris[] = 'Catatan dari guru: '.$this->Catatan_Guru;
+            $baris[] = '';
+            $baris[] = 'CATATAN PENGAMATAN GURU';
+            $baris[] = $this->Catatan_Guru;
         }
 
-        $baris[] = <<<'TEKS'
-        Tulis narasi perkembangan siswa dalam bahasa Indonesia dengan ketentuan:
-        1. Panjang tiga sampai empat kalimat, sekitar 60 sampai 100 kata, dalam satu paragraf.
-        2. Buka dengan bagaimana siswa mengikuti kegiatan pembelajaran dan sikapnya.
-        3. Lanjutkan dengan pengamatan yang konkret dan spesifik sesuai capaian di atas.
-        4. Tutup dengan harapan untuk perkembangan siswa selanjutnya.
-        5. Sebut nama siswa pada kalimat pertama saja, lalu gunakan "ia" atau "anak".
-        6. Tulis seluruhnya dalam bahasa Indonesia baku, tanpa menyisipkan kata asing.
-        7. Jangan menyebut nilai angka atau singkatan seperti MB, BSH, dan BSB.
-        8. Jangan membuat daftar bernomor atau berpoin, dan jangan memakai tanda bintang.
-        9. Balas hanya dengan narasinya, tanpa pembuka, penutup, atau penjelasan tambahan.
-        TEKS;
+        $baris[] = '';
+        $baris[] = 'Tulis narasi untuk peserta didik di atas.';
 
         return implode("\n", $baris);
     }
