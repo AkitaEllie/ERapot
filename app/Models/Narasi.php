@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Enums\StatusNarasi;
 use App\Models\Concerns\HasShortSequenceKey;
+use App\Services\Narasi\InstruksiNarasi;
 use Database\Factories\NarasiFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Scope;
@@ -162,6 +163,8 @@ class Narasi extends Model
             $baris[] = $this->Catatan_Guru;
         }
 
+        $baris[] = '';
+        $baris[] = InstruksiNarasi::gaya($mapel->Jenis_Mapel);
         $baris[] = '';
         $baris[] = 'Tulis narasi untuk peserta didik di atas.';
 

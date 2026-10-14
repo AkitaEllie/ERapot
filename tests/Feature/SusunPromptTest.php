@@ -1,5 +1,6 @@
 <?php
 
+use App\Enums\JenisMataPelajaran;
 use App\Enums\StatusNarasi;
 use App\Models\IndikatorCapaian;
 use App\Models\Kelas;
@@ -15,12 +16,17 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 
 uses(RefreshDatabase::class);
 
-function narasiDenganCapaian(array $capaian = []): Narasi
-{
+function narasiDenganCapaian(
+    array $capaian = [],
+    JenisMataPelajaran $jenis = JenisMataPelajaran::Intrakurikuler,
+): Narasi {
     $kelas = Kelas::factory()->create();
     $siswa = Siswa::factory()->create(['Nama' => 'Andini Pratiwi']);
     // Nama_Mapel is unique, and this helper may run more than once per test.
-    $mapel = MataPelajaran::factory()->create(['Nama_Mapel' => 'Jati Diri '.fake()->unique()->numerify('###')]);
+    $mapel = MataPelajaran::factory()->create([
+        'Nama_Mapel' => 'Jati Diri '.fake()->unique()->numerify('###'),
+        'Jenis_Mapel' => $jenis,
+    ]);
 
     Pembelajaran::factory()->create([
         'Kelas_ID' => $kelas->getKey(),
@@ -94,10 +100,24 @@ it('menyertakan catatan pengamatan guru bila ada', function (): void {
 });
 
 it('tidak membocorkan aturan panjang dan gaya ke prompt pengguna', function (): void {
-    // Those belong to the system instructions, which are identical on every call.
+    // The standing rules belong to the system instructions, shared by every call.
     $prompt = narasiDenganCapaian()->susunPrompt();
 
-    expect($prompt)->not->toContain('tiga sampai empat kalimat');
+    expect($prompt)->not->toContain('Balas hanya dengan narasinya');
+});
+
+it('menyertakan gaya prosa pada prompt mata pelajaran intrakurikuler', function (): void {
+    $prompt = narasiDenganCapaian(jenis: JenisMataPelajaran::Intrakurikuler)->susunPrompt();
+
+    expect($prompt)->toContain('Tulis tiga paragraf');
+});
+
+it('menyertakan gaya catatan pada prompt mata pelajaran muatan lokal', function (): void {
+    $prompt = narasiDenganCapaian(jenis: JenisMataPelajaran::MuatanLokal)->susunPrompt();
+
+    expect($prompt)
+        ->toContain('satu paragraf saja')
+        ->not->toContain('Tulis tiga paragraf');
 });
 
 it('tetap menyusun prompt walau tanpa capaian dan catatan', function (): void {
@@ -126,19 +146,8 @@ it('menyusun prompt dengan urutan yang tetap agar awalan dapat di-cache', functi
 });
 
 describe('instruksi sistem', function (): void {
-    it('meminta narasi dengan panjang seperti contoh rapor sekolah', function (): void {
-        // The school's samples run three to four sentences; without this the model
-        // returns one thin sentence, which is not what gets printed.
-        expect(InstruksiNarasi::SISTEM)
-            ->toContain('tiga sampai empat kalimat')
-            ->toContain('75')
-            ->toContain('100 kata');
-    });
-
     it('meminta struktur contoh rapor: pembuka, pengamatan, harapan', function (): void {
-        $sistem = InstruksiNarasi::SISTEM;
-
-        expect($sistem)
+        expect(InstruksiNarasi::SISTEM)
             ->toContain('Buka dengan')
             ->toContain('pengamatan yang konkret')
             ->toContain('harapan untuk perkembangan anak selanjutnya');
@@ -150,24 +159,59 @@ describe('instruksi sistem', function (): void {
             ->toContain('BSH');
     });
 
-    it('melarang daftar dan pembuka tambahan', function (): void {
+    it('meminta hanya narasinya tanpa pembuka tambahan', function (): void {
         expect(InstruksiNarasi::SISTEM)
-            ->toContain('Jangan membuat daftar')
-            ->toContain('Balas hanya dengan narasinya');
+            ->toContain('Balas hanya dengan narasinya')
+            ->toContain('Jangan menambahkan pembuka');
     });
 
     it('membatasi nama anak pada kalimat pertama', function (): void {
         expect(InstruksiNarasi::SISTEM)->toContain('Sebut nama anak pada kalimat pertama saja');
     });
 
-    it('memuat contoh bentuk tanpa menanamkan nama tertentu', function (): void {
-        // A hardcoded name in the example teaches the model to reuse it.
-        expect(InstruksiNarasi::SISTEM)
-            ->toContain('[nama]')
-            ->not->toContain('Arana');
-    });
-
     it('ditulis dalam bahasa Indonesia', function (): void {
         expect(InstruksiNarasi::SISTEM)->toContain('bahasa Indonesia');
+    });
+});
+
+describe('gaya per bentuk halaman', function (): void {
+    it('memilih gaya prosa untuk mata pelajaran intrakurikuler', function (): void {
+        expect(InstruksiNarasi::gaya(JenisMataPelajaran::Intrakurikuler))
+            ->toBe(InstruksiNarasi::GAYA_PROSA);
+    });
+
+    it('memilih gaya prosa untuk mata pelajaran kokurikuler', function (): void {
+        expect(InstruksiNarasi::gaya(JenisMataPelajaran::KoKurikuler))
+            ->toBe(InstruksiNarasi::GAYA_PROSA);
+    });
+
+    it('memilih gaya catatan untuk mata pelajaran muatan lokal', function (): void {
+        expect(InstruksiNarasi::gaya(JenisMataPelajaran::MuatanLokal))
+            ->toBe(InstruksiNarasi::GAYA_CATATAN);
+    });
+
+    it('meminta beberapa paragraf pada gaya prosa', function (): void {
+        // The PDF's Section A prose runs to several paragraphs, and the report
+        // book is the homeroom teacher's document.
+        expect(InstruksiNarasi::GAYA_PROSA)
+            ->toContain('Tulis tiga paragraf')
+            ->toContain('baris kosong');
+    });
+
+    it('mengizinkan daftar berpoin pada gaya prosa saja', function (): void {
+        // The reference's Section A lists habits; the Catatan box has no room.
+        expect(InstruksiNarasi::GAYA_PROSA)->toContain('daftar berpoin')
+            ->and(InstruksiNarasi::GAYA_CATATAN)->toContain('Jangan membuat daftar');
+    });
+
+    it('meminta satu paragraf pada gaya catatan', function (): void {
+        expect(InstruksiNarasi::GAYA_CATATAN)->toContain('satu paragraf saja');
+    });
+
+    it('memuat target jumlah kata pada kedua gaya', function (): void {
+        // The model honours a word target only when it is explicit, and the
+        // sentence wraps inside the heredoc.
+        expect(InstruksiNarasi::GAYA_PROSA)->toContain('Jumlah kata ini')
+            ->and(InstruksiNarasi::GAYA_CATATAN)->toContain('Jumlah kata ini');
     });
 });

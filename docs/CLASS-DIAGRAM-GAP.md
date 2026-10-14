@@ -85,7 +85,7 @@ it, which is why the second driver covers most alternatives for the price of one
 
 Adding a provider is one class implementing the contract plus one config entry.
 
-### The prompt is split, and the split is deliberate
+### The prompt is split three ways
 
 `Narasi::susunPrompt()` returns the **user** prompt: only the facts that differ
 between students (name, class, semester, subject, the selected indicators with
@@ -97,8 +97,33 @@ call, and held in the driver rather than passed by the caller. Two reasons:
 1. It is not per-student, so it does not belong in the caller's data.
 2. A prefix that never changes is what a provider can cache.
 
-That second point is measured, not assumed. On the configured endpoint the same
-request reports `cached_tokens` rising to the full prompt on the second call:
+The **style** is separate again, because the same narration is printed in two
+different places and they do not want the same shape:
+
+| Style | Used by | Shape |
+| --- | --- | --- |
+| `GAYA_PROSA` | `intrakurikuler`, `kokurikuler` | Two or three paragraphs, 130–180 words, a bulleted list allowed |
+| `GAYA_CATATAN` | `muatan_lokal` | One paragraph, 90–120 words, no lists |
+
+`InstruksiNarasi::gaya()` picks by `Jenis_Mapel` — the same field that already
+decides Section A/B versus the table pages — and `susunPrompt()` places the
+chosen style last, next to the task, because that is the position a model
+follows most closely. The style rides in the user prompt rather than the system
+prompt so the cacheable prefix stays byte-identical; measured at 586 of 586
+tokens cached on every call after the first.
+
+The two shapes come from the two reference documents. `docs/contoh-rapor.pdf` is
+the homeroom teacher's book and shows multi-paragraph prose with a habit list;
+the per-subject DOCX drafts are the subject teacher's page and show a single
+paragraph in a narrower box beside a photo.
+
+The system prompt is written in Indonesian, because the earlier English phrasing
+let English leak into the narration.
+
+### Caching is measured, not assumed
+
+On the configured endpoint the same request reports `cached_tokens` rising to the
+full prompt from the second call on:
 
 | Call | Prompt tokens | Cached |
 | --- | --- | --- |
@@ -108,11 +133,6 @@ request reports `cached_tokens` rising to the full prompt on the second call:
 
 `PenyediaHttp::catatPemakaian()` logs prompt, cached and completion tokens at
 debug level, so whether the cache is helping stays answerable.
-
-The system prompt is written in Indonesian, because the earlier English phrasing
-let English leak into the narration. Its length and structure rules follow the
-school's own report samples, and its worked example uses `[nama]` rather than a
-real name, which would otherwise teach the model to reuse that name.
 
 ### Narration failure handling
 
