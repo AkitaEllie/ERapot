@@ -88,3 +88,37 @@ it('tetap menyusun prompt walau tidak ada capaian yang dipilih', function (): vo
     expect($prompt)->toContain('Andini Pratiwi')
         ->and(trim($prompt))->not->toBe('');
 });
+
+it('meminta narasi panjang seperti contoh rapor sekolah', function (): void {
+    // The school's own samples run three to four sentences; without an explicit
+    // length the model returns one thin sentence, which is not what gets printed.
+    $prompt = narasiDenganCapaian()->susunPrompt();
+
+    expect($prompt)
+        ->toContain('tiga sampai empat kalimat')
+        ->toContain('60 sampai 100 kata');
+});
+
+it('meminta struktur contoh rapor: pembuka, pengamatan, harapan', function (): void {
+    $prompt = narasiDenganCapaian()->susunPrompt();
+
+    expect($prompt)
+        ->toContain('Buka dengan')
+        ->toContain('pengamatan yang konkret')
+        ->toContain('harapan untuk perkembangan siswa selanjutnya');
+});
+
+it('melarang nilai angka dan daftar di dalam narasi', function (): void {
+    $prompt = narasiDenganCapaian()->susunPrompt();
+
+    expect($prompt)
+        ->toContain('Jangan menyebut nilai angka')
+        ->toContain('BSH')
+        ->toContain('Jangan membuat daftar');
+});
+
+it('membatasi nama siswa pada kalimat pertama', function (): void {
+    $prompt = narasiDenganCapaian()->susunPrompt();
+
+    expect($prompt)->toContain('Sebut nama siswa pada kalimat pertama saja');
+});

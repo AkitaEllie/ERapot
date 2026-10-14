@@ -120,22 +120,29 @@ class Narasi extends Model
      * and may add their own note; both are what the narrative should express, so
      * both go into the prompt. Written in Indonesian because the narrative it
      * produces is in Indonesian.
+     *
+     * The length and shape instructions follow the school's own report samples:
+     * an opening about how the child took part, several sentences of concrete
+     * observations, then a forward-looking hope. Without them the model returns a
+     * single thin sentence, which is not what the printed report looks like.
      */
     public function susunPrompt(): string
     {
         $siswa = $this->rapor->siswa;
         $mapel = $this->mataPelajaran;
 
-        $indikator = $this->nilaiSiswa()
+        $nilai = $this->nilaiSiswa()
             ->where('Dipilih_Untuk_Narasi', true)
             ->with('indikatorCapaian')
-            ->get()
-            ->map(fn (NilaiSiswa $nilai): ?string => $nilai->indikatorCapaian?->Deskripsi)
+            ->get();
+
+        $indikator = $nilai
+            ->map(fn (NilaiSiswa $n): ?string => $n->indikatorCapaian?->Deskripsi)
             ->filter()
             ->values();
 
         $baris = [
-            'Anda menyusun narasi rapor untuk pendidikan anak usia dini.',
+            'Anda adalah guru taman kanak-kanak yang menyusun narasi rapor.',
             "Nama siswa: {$siswa->Nama}.",
             "Mata pelajaran: {$mapel->Nama_Mapel}.",
         ];
@@ -149,8 +156,18 @@ class Narasi extends Model
             $baris[] = 'Catatan dari guru: '.$this->Catatan_Guru;
         }
 
-        $baris[] = 'Tulis satu paragraf narasi perkembangan siswa dalam bahasa Indonesia, '
-            .'menggunakan nama siswa, tanpa menyebut nilai angka, dan tanpa membuat daftar.';
+        $baris[] = <<<'TEKS'
+        Tulis narasi perkembangan siswa dalam bahasa Indonesia dengan ketentuan:
+        1. Panjang tiga sampai empat kalimat, sekitar 60 sampai 100 kata, dalam satu paragraf.
+        2. Buka dengan bagaimana siswa mengikuti kegiatan pembelajaran dan sikapnya.
+        3. Lanjutkan dengan pengamatan yang konkret dan spesifik sesuai capaian di atas.
+        4. Tutup dengan harapan untuk perkembangan siswa selanjutnya.
+        5. Sebut nama siswa pada kalimat pertama saja, lalu gunakan "ia" atau "anak".
+        6. Tulis seluruhnya dalam bahasa Indonesia baku, tanpa menyisipkan kata asing.
+        7. Jangan menyebut nilai angka atau singkatan seperti MB, BSH, dan BSB.
+        8. Jangan membuat daftar bernomor atau berpoin, dan jangan memakai tanda bintang.
+        9. Balas hanya dengan narasinya, tanpa pembuka, penutup, atau penjelasan tambahan.
+        TEKS;
 
         return implode("\n", $baris);
     }
