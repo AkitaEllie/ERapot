@@ -73,9 +73,20 @@ if errorlevel 1 (
 echo     ok Basis data terhubung (!DB_TARGET!)
 
 REM --- Migrasi dan data contoh ---
-echo ==^> Menjalankan migrasi dan mengisi data contoh
+echo ==^> Menjalankan migrasi
 php artisan migrate --force --ansi || exit /b 1
-php artisan db:seed --force --ansi || exit /b 1
+
+REM Data contoh bukan idempotent: ia membuat tahun ajaran dan kelas yang punya
+REM indeks unik, jadi menjalankannya dua kali akan gagal. Lewati bila basis data
+REM sudah berisi data, supaya skrip ini aman dijalankan ulang.
+php artisan tinker --execute="exit(App\Models\TahunAjaran::query()->exists() ? 1 : 0);" >nul 2>&1
+if errorlevel 1 (
+    echo ==^> Mengisi data contoh
+    php artisan db:seed --force --ansi || exit /b 1
+) else (
+    echo     ! Basis data sudah berisi data, data contoh dilewati
+    echo       Untuk memulai dari awal: php artisan migrate:fresh --seed
+)
 
 REM --- Penyimpanan dan aset ---
 echo ==^> Menautkan penyimpanan

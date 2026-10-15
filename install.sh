@@ -65,11 +65,15 @@ info "Memeriksa basis data"
 # bisa berbeda di tiap komputer. Beri tahu perintahnya bila belum ada.
 # Pembacaannya lewat Laravel, bukan parse .env, karena .env memuat komentar
 # dan tanda kutip yang mudah salah dibaca.
-DB_TARGET=$(php scripts/check-database.php 2>/dev/null | sed -n 's/^target=//p')
+#
+# The "|| true" matters: set -e would otherwise end the script the moment the
+# check reports the database is down, before the message below can explain it.
+DB_REPORT=$(php scripts/check-database.php 2>&1) || true
+DB_TARGET=$(printf '%s\n' "$DB_REPORT" | sed -n 's/^target=//p')
 DB_NAME=$(printf '%s' "${DB_TARGET##*/}")
 DB_USER=$(printf '%s' "${DB_TARGET%%@*}")
 
-if ! php scripts/check-database.php >/dev/null 2>&1; then
+if ! printf '%s\n' "$DB_REPORT" | grep -qx 'ok'; then
     printf '\n' >&2
     fail "Basis data belum bisa dihubungi.
 
@@ -90,9 +94,19 @@ ok "Basis data terhubung (${DB_TARGET})"
 
 # --- Migrasi dan data contoh ------------------------------------------------
 
-info "Menjalankan migrasi dan mengisi data contoh"
+info "Menjalankan migrasi"
 php artisan migrate --force --ansi
-php artisan db:seed --force --ansi
+
+# Data contoh bukan idempotent: ia membuat tahun ajaran dan kelas yang punya
+# indeks unik, jadi menjalankannya dua kali akan gagal. Lewati bila basis data
+# sudah berisi data, supaya skrip ini aman dijalankan ulang.
+if php artisan tinker --execute='exit(App\Models\TahunAjaran::query()->exists() ? 1 : 0);' >/dev/null 2>&1; then
+    info "Mengisi data contoh"
+    php artisan db:seed --force --ansi
+else
+    warn "Basis data sudah berisi data, data contoh dilewati"
+    warn "Untuk memulai dari awal: php artisan migrate:fresh --seed"
+fi
 
 # --- Penyimpanan dan aset ---------------------------------------------------
 
