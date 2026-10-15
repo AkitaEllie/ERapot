@@ -148,8 +148,8 @@ class extends \Livewire\Component
                         <div class="leading-tight">
                             <h2 class="text-[16px] font-semibold text-heading">{{ $rapor->siswa->Nama }} - NISN {{ $rapor->siswa->NISN }}</h2>
                             <p class="text-[13px] text-muted">
-                                {{-- Not on ERD/CD: the ERD has no submission timestamp, so the
-                                     report's creation time stands in for the submission date. --}}
+                                {{-- The ERD has no submission timestamp, so the report's creation
+                                     time stands in for the submission date. --}}
                                 Diajukan oleh {{ $rapor->kelas->waliKelas?->Nama ?? 'guru' }} - {{ $rapor->created_at?->format('j F Y') }}
                             </p>
                         </div>

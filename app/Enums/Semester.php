@@ -7,8 +7,6 @@ enum Semester: string
     case Ganjil = 'ganjil';
     case Genap = 'genap';
 
-    // Not on ERD/CD: presentation helpers for form selects, added during scaffolding.
-
     /**
      * @return array<string, string>
      */

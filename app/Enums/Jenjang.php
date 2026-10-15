@@ -9,8 +9,6 @@ enum Jenjang: string
     case Tka = 'TK-A';
     case Tkb = 'TK-B';
 
-    // Not on ERD/CD: presentation helpers for form selects, added during scaffolding.
-
     /**
      * @return array<string, string>
      */

@@ -10,8 +10,6 @@ enum RaporStatus: string
     case PerluRevisi = 'perlu_revisi';
     case Disetujui = 'disetujui';
 
-    // Not on ERD/CD: presentation helpers for form selects, added during scaffolding.
-
     /**
      * @return array<string, string>
      */
@@ -30,8 +28,6 @@ enum RaporStatus: string
     {
         return self::options()[$this->value];
     }
-
-    // Not on ERD/CD: Tailwind classes for status badges, added during scaffolding.
 
     public function badgeClasses(): string
     {

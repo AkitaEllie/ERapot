@@ -59,7 +59,7 @@ class IndikatorCapaian extends Model
 
     protected static function booted(): void
     {
-        // Not on ERD/CD: Kode_KD is derived from the generated Indikator_ID so the
+        // Kode_KD is derived from the generated Indikator_ID so the
         // teacher-facing code always stays in step with the short sequence key.
         static::creating(function (self $indikator): void {
             if (blank($indikator->Kode_KD)) {
@@ -91,8 +91,6 @@ class IndikatorCapaian extends Model
     {
         return $this->hasMany(NilaiSiswa::class, 'Indikator_ID', 'Indikator_ID');
     }
-
-    // Not on ERD/CD: query scope added during scaffolding.
 
     /**
      * @param  Builder<IndikatorCapaian>  $query

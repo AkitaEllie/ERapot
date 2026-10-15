@@ -63,8 +63,6 @@ class NilaiSiswa extends Model
         return $this->belongsTo(IndikatorCapaian::class, 'Indikator_ID', 'Indikator_ID');
     }
 
-    // Not on ERD/CD: query scope added during scaffolding.
-
     /**
      * @param  Builder<NilaiSiswa>  $query
      * @return Builder<NilaiSiswa>
@@ -75,7 +73,7 @@ class NilaiSiswa extends Model
         return $query->where('Dipilih_Untuk_Narasi', true);
     }
 
-    // Not on ERD/CD: the ERD gives this table no Siswa_ID, so the student is
+    // The ERD gives this table no Siswa_ID, so the student is
     // reached by walking narasi -> rapor -> siswa. A plain method rather than a
     // relation because it cannot be eager loaded.
 

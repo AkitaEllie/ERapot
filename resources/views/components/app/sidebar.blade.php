@@ -35,7 +35,7 @@
         default => 'PENGGUNA',
     };
 
-    // Not on ERD/CD: sidebar entries map to the built screens; screens that do not exist
+    // Sidebar entries map to the built screens; screens that do not exist
     // yet keep a null target and render as disabled placeholders.
     $targets = [
         'indikator' => fn (): string => route('indikator'),

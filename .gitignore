@@ -40,3 +40,7 @@ yarn-error.log
 
 # Local MariaDB data directory (root-owned, not part of the app)
 /data
+
+# Reference material (ERD, class diagram, sample reports) is kept outside the
+# repository. docs/CLASS-DIAGRAM-GAP.md documents what diverges from them.
+/docs

@@ -65,8 +65,6 @@ class TahunAjaran extends Model
         return $this->hasMany(IndikatorCapaian::class, 'TahunAjaran_ID', 'TahunAjaran_ID');
     }
 
-    // Not on ERD/CD: query scope and date-range helper added during scaffolding.
-
     /**
      * @param  Builder<TahunAjaran>  $query
      * @return Builder<TahunAjaran>

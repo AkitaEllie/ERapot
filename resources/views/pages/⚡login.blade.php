@@ -39,7 +39,7 @@ new class extends Component
 
         // Auth::attempt() already rotates the session id to prevent fixation.
 
-        // Not on ERD/CD: the intended URL is dropped rather than followed. Laravel's
+        // The intended URL is dropped rather than followed. Laravel's
         // intended() replays the stored absolute URL with no host check, so a stale or
         // tampered value can bounce the user to another origin, and the landing page here
         // is role-dependent anyway (see the dashboard route).

@@ -67,8 +67,6 @@ class MataPelajaran extends Model
         return $this->hasMany(Narasi::class, 'Mapel_ID', 'Mapel_ID');
     }
 
-    // Not on ERD/CD: query scope added during scaffolding.
-
     /**
      * @param  Builder<MataPelajaran>  $query
      * @return Builder<MataPelajaran>

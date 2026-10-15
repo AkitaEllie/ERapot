@@ -8,8 +8,6 @@ enum JenisMataPelajaran: string
     case KoKurikuler = 'kokurikuler';
     case MuatanLokal = 'muatan_lokal';
 
-    // Not on ERD/CD: presentation helpers for form selects, added during scaffolding.
-
     /**
      * @return array<string, string>
      */

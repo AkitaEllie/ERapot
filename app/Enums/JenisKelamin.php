@@ -7,8 +7,6 @@ enum JenisKelamin: string
     case LakiLaki = 'L';
     case Perempuan = 'P';
 
-    // Not on ERD/CD: presentation helpers for form selects, added during scaffolding.
-
     /**
      * @return array<string, string>
      */

@@ -113,8 +113,6 @@ class Rapor extends Model
         return $this->hasMany(Narasi::class, 'Rapor_ID', 'Rapor_ID');
     }
 
-    // Not on ERD/CD: query scopes added during scaffolding.
-
     /**
      * @param  Builder<Rapor>  $query
      * @return Builder<Rapor>
@@ -135,7 +133,7 @@ class Rapor extends Model
         return $query->where('Status', RaporStatus::Menunggu->value);
     }
 
-    // Not on ERD/CD: two-hop lookup (rapor -> kelas -> pembelajaran -> mapel) that
+    // Two-hop lookup (rapor -> kelas -> pembelajaran -> mapel) that
     // Eloquent cannot express as a relation, so it cannot be eager loaded.
 
     /**
@@ -231,7 +229,7 @@ class Rapor extends Model
         //
     }
 
-    // Not on ERD/CD: the report document's subject grouping, shared by the
+    // The report document's subject grouping, shared by the
     // preview screen and the PDF export so both render the same content.
 
     /**

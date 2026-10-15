@@ -8,8 +8,6 @@ enum StatusNarasi: string
     case Diedit = 'diedit';
     case Final = 'final';
 
-    // Not on ERD/CD: presentation helpers for form selects, added during scaffolding.
-
     /**
      * @return array<string, string>
      */
@@ -26,8 +24,6 @@ enum StatusNarasi: string
     {
         return self::options()[$this->value];
     }
-
-    // Not on ERD/CD: state helper added during scaffolding.
 
     public function isFinal(): bool
     {

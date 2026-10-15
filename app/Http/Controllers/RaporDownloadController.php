@@ -11,7 +11,7 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
 /**
  * Streams an exported report card as a download.
  *
- * Not on ERD/CD: the class diagram models the export as Rapor::eksporPDF(), which
+ * The class diagram models the export as Rapor::eksporPDF(), which
  * produces the file, but says nothing about how the browser receives it. That
  * transport lives here.
  */

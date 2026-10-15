@@ -100,13 +100,11 @@ class extends \Livewire\Component
 
     public function importExcel(): void
     {
-        // Not on ERD/CD: bulk Excel import is not part of the class diagram.
         session()->flash('galat', 'Import Excel belum diimplementasikan.');
     }
 
     public function tambahSiswa(): void
     {
-        // Not on ERD/CD: the create/edit student form is a later screen.
         session()->flash('galat', 'Form tambah siswa belum diimplementasikan.');
     }
 };

@@ -37,7 +37,7 @@ class User extends Authenticatable
 
     protected $primaryKey = 'User_ID';
 
-    // Not on ERD/CD: maps the framework's "name" attribute onto the ERD's Nama
+    // Maps the framework's "name" attribute onto the ERD's Nama
     // column so authentication, notifications and auth()->user()->name work.
 
     /**
@@ -107,8 +107,6 @@ class User extends Authenticatable
     {
         return $this->hasMany(Rapor::class, 'Disetujui_Oleh', 'User_ID');
     }
-
-    // Not on ERD/CD: query scope and initials helper added during scaffolding.
 
     /**
      * @param  Builder<User>  $query

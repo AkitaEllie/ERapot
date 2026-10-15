@@ -8,8 +8,6 @@ enum TipeIndikator: string
     case Perilaku = 'perilaku';
     case Dimensi = 'dimensi';
 
-    // Not on ERD/CD: presentation helpers for form selects, added during scaffolding.
-
     /**
      * @return array<string, string>
      */

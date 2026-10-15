@@ -3,6 +3,7 @@ name: tests
 on:
   push:
     branches:
+      - master
       - main
   pull_request:
 
@@ -12,6 +13,30 @@ permissions:
 jobs:
   ci:
     runs-on: ubuntu-latest
+
+    # The suite is database-backed, and composer setup migrates, so the runner
+    # needs a real MySQL to talk to.
+    services:
+      mysql:
+        image: mysql:8
+        env:
+          MYSQL_ROOT_PASSWORD: password
+          MYSQL_DATABASE: laravel_test
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -ppassword"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
+
+    env:
+      DB_CONNECTION: mysql
+      DB_HOST: 127.0.0.1
+      DB_PORT: 3306
+      DB_DATABASE: laravel_test
+      DB_USERNAME: root
+      DB_PASSWORD: password
 
     steps:
       - name: Checkout code
@@ -30,6 +55,16 @@ jobs:
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: '22'
+
+      # composer setup only copies .env.example when .env is absent, and .env
+      # takes precedence over the job env above, so point it at the service
+      # database before anything reads it.
+      - name: Point .env at the service database
+        run: |
+          cp .env.example .env
+          sed -i "s/^DB_DATABASE=.*/DB_DATABASE=laravel_test/" .env
+          sed -i "s/^DB_USERNAME=.*/DB_USERNAME=root/" .env
+          sed -i "s/^DB_PASSWORD=.*/DB_PASSWORD=password/" .env
 
       - name: Setup Application
         run: composer setup

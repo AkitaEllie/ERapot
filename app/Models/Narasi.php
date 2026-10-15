@@ -95,8 +95,6 @@ class Narasi extends Model
         return $this->hasMany(Dokumentasi::class, 'Narasi_ID', 'Narasi_ID');
     }
 
-    // Not on ERD/CD: query scope and text accessor added during scaffolding.
-
     /**
      * @param  Builder<Narasi>  $query
      * @return Builder<Narasi>
