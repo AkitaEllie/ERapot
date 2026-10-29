@@ -159,6 +159,42 @@ class Rapor extends Model
     }
 
     /**
+     * Whether the user owns this report book: the class's homeroom teacher, or an
+     * administrator. Only the owner submits the report for approval.
+     */
+    public function milikWaliKelas(User $user): bool
+    {
+        return $user->Role_ID === 'ADMIN' || $this->kelas->User_ID === $user->getKey();
+    }
+
+    /**
+     * Whether the user may open this report at all: its owner, or a teacher
+     * assigned to one of the class's subjects.
+     */
+    public function bolehDibukaOleh(User $user): bool
+    {
+        return $this->milikWaliKelas($user)
+            || Pembelajaran::query()
+                ->where('Kelas_ID', $this->Kelas_ID)
+                ->where('User_ID', $user->getKey())
+                ->exists();
+    }
+
+    /**
+     * Whether the user may fill in the given subject of this report: its owner, or
+     * the teacher assigned to that subject in this class.
+     */
+    public function bolehDiisiOleh(User $user, MataPelajaran $mapel): bool
+    {
+        return $this->milikWaliKelas($user)
+            || Pembelajaran::query()
+                ->where('Kelas_ID', $this->Kelas_ID)
+                ->where('Mapel_ID', $mapel->getKey())
+                ->where('User_ID', $user->getKey())
+                ->exists();
+    }
+
+    /**
      * Mark an untouched report as being worked on, the first time a teacher saves
      * anything into it. Without this a report would sit at Belum Diisi forever
      * and could never be submitted.

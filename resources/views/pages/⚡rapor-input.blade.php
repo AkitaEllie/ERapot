@@ -45,6 +45,8 @@ class extends \Livewire\Component
 
     public function mount(): void
     {
+        abort_unless($this->rapor->bolehDiisiOleh(auth()->user(), $this->mapel), 403);
+
         $narasi = $this->narasi;
 
         $this->catatan = $narasi?->Catatan_Guru ?? '';
@@ -76,12 +78,18 @@ class extends \Livewire\Component
             ->first();
     }
 
-    /** @return Collection<int, MataPelajaran> */
+    /**
+     * The subject tabs this teacher may open: all of them for the class's
+     * homeroom teacher, only their own for a subject teacher.
+     *
+     * @return Collection<int, MataPelajaran>
+     */
     #[Computed]
     public function daftarMapel(): Collection
     {
         return Pembelajaran::query()
             ->where('Kelas_ID', $this->rapor->Kelas_ID)
+            ->unless($this->rapor->milikWaliKelas(auth()->user()), fn ($query) => $query->where('User_ID', auth()->id()))
             ->with('mataPelajaran')
             ->get()
             ->pluck('mataPelajaran')
@@ -229,9 +237,14 @@ class extends \Livewire\Component
 
     public function hapusFoto(string $dokumentasiId): void
     {
+        if ($this->terkunci()) {
+            return;
+        }
+
         $dokumentasi = $this->narasi?->dokumentasi->firstWhere('Dokumentasi_ID', $dokumentasiId);
 
         $dokumentasi?->hapusFoto();
+        unset($this->narasi);
     }
 
     private function ensureNarasi(): Narasi
@@ -333,7 +346,9 @@ class extends \Livewire\Component
         <x-slot:actions>
             <x-ui.badge :status="$rapor->Status">{{ $rapor->Status->label() }}</x-ui.badge>
             <x-ui.button type="button" variant="secondary" wire:click="simpanDraft" :disabled="! $rapor->bolehDiubah()">Simpan Draft</x-ui.button>
-            <x-ui.button type="button" variant="primary" wire:click="ajukan" :disabled="! $rapor->bolehDiubah()">{{ $rapor->Status === \App\Enums\RaporStatus::PerluRevisi ? 'Ajukan Ulang' : 'Ajukan Rapor' }}</x-ui.button>
+            @if ($rapor->milikWaliKelas(auth()->user()))
+                <x-ui.button type="button" variant="primary" wire:click="ajukan" :disabled="! $rapor->bolehDiubah()">{{ $rapor->Status === \App\Enums\RaporStatus::PerluRevisi ? 'Ajukan Ulang' : 'Ajukan Rapor' }}</x-ui.button>
+            @endif
         </x-slot:actions>
     </x-app.header>
 
@@ -414,11 +429,13 @@ class extends \Livewire\Component
                             <figure class="relative w-[120px]">
                                 <img src="{{ Storage::url($foto->Foto) }}" alt="{{ $foto->Keterangan }}" class="h-[110px] w-[120px] rounded border border-hairline object-cover">
                                 <figcaption class="mt-1 truncate text-[13px] text-muted">{{ $foto->Keterangan }}</figcaption>
-                                <button type="button" wire:click="hapusFoto('{{ $foto->Dokumentasi_ID }}')" class="absolute -top-1.5 -right-1.5 flex size-5 items-center justify-center rounded-full bg-surface text-muted ring-1 ring-hairline transition-colors hover:text-rose-700" aria-label="Hapus foto">&times;</button>
+                                @if ($rapor->bolehDiubah())
+                                    <button type="button" wire:click="hapusFoto('{{ $foto->Dokumentasi_ID }}')" class="absolute -top-1.5 -right-1.5 flex size-5 items-center justify-center rounded-full bg-surface text-muted ring-1 ring-hairline transition-colors hover:text-rose-700" aria-label="Hapus foto">&times;</button>
+                                @endif
                             </figure>
                         @endforeach
 
-                        @if (($this->narasi?->dokumentasi->count() ?? 0) < Dokumentasi::MAKS_FOTO)
+                        @if ($rapor->bolehDiubah() && ($this->narasi?->dokumentasi->count() ?? 0) < Dokumentasi::MAKS_FOTO)
                             <label class="flex h-[110px] w-[120px] cursor-pointer flex-col items-center justify-center gap-1 rounded border border-dashed border-hairline-strong bg-surface text-muted transition-colors hover:border-accent hover:text-accent-deep">
                                 <span class="text-[22px] leading-none">+</span>
                                 <span class="text-[13px]">Unggah</span>

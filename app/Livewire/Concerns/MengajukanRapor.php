@@ -30,6 +30,10 @@ trait MengajukanRapor
 
     public function periksaPengajuan(): void
     {
+        if (! $this->bolehMengajukan()) {
+            return;
+        }
+
         if (! $this->rapor->bolehDiubah()) {
             session()->flash('galat', 'Rapor sedang menunggu persetujuan Kepala Sekolah.');
 
@@ -44,6 +48,10 @@ trait MengajukanRapor
 
     public function konfirmasiAjukan(): void
     {
+        if (! $this->bolehMengajukan()) {
+            return;
+        }
+
         $rapor = $this->rapor->fresh();
 
         // The report may have changed since the dialog opened, so check again.
@@ -74,5 +82,19 @@ trait MengajukanRapor
     {
         $this->modalAjukan = null;
         $this->kekurangan = [];
+    }
+
+    /**
+     * The whole report book goes to the principal, so only its owner sends it.
+     */
+    private function bolehMengajukan(): bool
+    {
+        if ($this->rapor->milikWaliKelas(auth()->user())) {
+            return true;
+        }
+
+        session()->flash('galat', 'Rapor hanya dapat diajukan oleh wali kelas.');
+
+        return false;
     }
 }

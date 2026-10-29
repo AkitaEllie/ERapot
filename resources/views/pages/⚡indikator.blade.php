@@ -8,6 +8,7 @@ use App\Models\MataPelajaran;
 use App\Models\ProgramPengembangan;
 use App\Models\TahunAjaran;
 use Illuminate\Support\Collection;
+use Illuminate\Validation\Rule;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Url;
@@ -32,7 +33,13 @@ class extends \Livewire\Component
     /** Indikator_ID being created or edited, or null when the form is closed. */
     public ?string $formIndikator = null;
 
+    /** The subject the indicator is filed under; it limits the program choice. */
+    public string $formMapel = '';
+
     public ?string $formProgram = null;
+
+    /** Name for a program created on the spot, used when no program is chosen. */
+    public string $formProgramBaru = '';
 
     public string $formDeskripsi = '';
 
@@ -82,52 +89,110 @@ class extends \Livewire\Component
 
     public function tambah(): void
     {
-        $this->reset('formIndikator', 'formDeskripsi', 'formTipe');
-        $this->formProgram = $this->program->first()?->getKey();
+        $this->reset('formIndikator', 'formDeskripsi', 'formTipe', 'formProgramBaru');
+        $this->formMapel = $this->filterMapel;
+        $this->formProgram = $this->programForm->first()?->getKey();
         $this->formTerbuka = true;
     }
 
     public function ubah(string $indikatorId): void
     {
-        $indikator = IndikatorCapaian::query()->findOrFail($indikatorId);
+        $indikator = IndikatorCapaian::query()->with('program')->findOrFail($indikatorId);
 
         $this->formIndikator = $indikator->getKey();
+        $this->formMapel = $indikator->program->Mapel_ID;
         $this->formProgram = $indikator->Program_ID;
+        $this->formProgramBaru = '';
         $this->formDeskripsi = $indikator->Deskripsi;
         $this->formTipe = $indikator->Tipe->value;
         $this->formTerbuka = true;
     }
 
+    /**
+     * A program belongs to one subject, so switching the subject offers that
+     * subject's programs instead of keeping a program from another one.
+     */
+    public function updatedFormMapel(): void
+    {
+        $this->formProgram = $this->programForm->first()?->getKey();
+        $this->formProgramBaru = '';
+    }
+
+    /**
+     * The programs of the subject chosen in the form.
+     *
+     * @return Collection<int, ProgramPengembangan>
+     */
+    #[Computed]
+    public function programForm(): Collection
+    {
+        if ($this->formMapel === '') {
+            return collect();
+        }
+
+        return ProgramPengembangan::query()
+            ->where('Mapel_ID', $this->formMapel)
+            ->orderBy('Nama_Program')
+            ->get();
+    }
+
     public function tutupForm(): void
     {
-        $this->reset('formTerbuka', 'formIndikator', 'formProgram', 'formDeskripsi', 'formTipe');
+        $this->reset('formTerbuka', 'formIndikator', 'formMapel', 'formProgram', 'formProgramBaru', 'formDeskripsi', 'formTipe');
     }
 
     public function simpan(): void
     {
+        $baru = $this->formIndikator === null;
+
         $this->validate([
-            'formProgram' => ['required', 'string'],
+            'formMapel' => ['required', Rule::exists('mata_pelajarans', 'Mapel_ID')],
+            'formProgram' => [
+                'nullable',
+                'required_without:formProgramBaru',
+                Rule::exists('program_pengembangans', 'Program_ID')->where('Mapel_ID', $this->formMapel),
+            ],
+            'formProgramBaru' => ['nullable', 'required_without:formProgram', 'string', 'max:255'],
             'formDeskripsi' => ['required', 'string', 'max:255'],
-            'formTipe' => ['required', 'string'],
+            'formTipe' => ['required', Rule::enum(TipeIndikator::class)],
+            // A new indicator takes its level and semester from the filters; there
+            // is no safe default, so an unset filter must be chosen first.
+            'filterJenjang' => [Rule::requiredIf($baru)],
+            'filterSemester' => [Rule::requiredIf($baru)],
+        ], [
+            'formMapel.required' => 'Pilih mata pelajaran.',
+            'formProgram.required_without' => 'Pilih program pengembangan atau tulis nama program baru.',
+            'formProgram.exists' => 'Program tidak termasuk mata pelajaran yang dipilih.',
+            'formProgramBaru.required_without' => 'Pilih program pengembangan atau tulis nama program baru.',
+            'formDeskripsi.required' => 'Deskripsi indikator wajib diisi.',
+            'formTipe.required' => 'Pilih tipe indikator.',
+            'filterJenjang.required' => 'Pilih jenjang pada filter di atas terlebih dahulu.',
+            'filterSemester.required' => 'Pilih semester pada filter di atas terlebih dahulu.',
         ]);
 
-        $tahunAjaran = $this->periodeAktif;
+        $programId = filled($this->formProgram)
+            ? $this->formProgram
+            : ProgramPengembangan::create(['Mapel_ID' => $this->formMapel, 'Nama_Program' => trim($this->formProgramBaru)])->getKey();
 
         $data = [
-            'Program_ID' => $this->formProgram,
-            'TahunAjaran_ID' => $tahunAjaran?->getKey(),
-            'Jenjang' => $this->filterJenjang !== '' ? $this->filterJenjang : Jenjang::KBA->value,
-            'Semester' => $this->filterSemester !== '' ? $this->filterSemester : Semester::Ganjil->value,
+            'Program_ID' => $programId,
             'Tipe' => $this->formTipe,
             'Deskripsi' => $this->formDeskripsi,
         ];
 
-        if ($this->formIndikator === null) {
-            IndikatorCapaian::create($data);
+        if ($baru) {
+            IndikatorCapaian::create($data + [
+                'TahunAjaran_ID' => $this->periodeAktif?->getKey(),
+                'Jenjang' => $this->filterJenjang,
+                'Semester' => $this->filterSemester,
+            ]);
         } else {
             IndikatorCapaian::query()->findOrFail($this->formIndikator)->update($data);
         }
 
+        // Show the subject the indicator was filed under, so it is never saved
+        // somewhere the list is not looking.
+        $this->filterMapel = $this->formMapel;
         $this->tutupForm();
 
         session()->flash('sukses', 'Indikator tersimpan.');
@@ -259,6 +324,30 @@ class extends \Livewire\Component
             <form wire:submit="simpan" class="rounded border border-hairline bg-surface p-4">
                 <h2 class="text-[15px] font-semibold text-heading">{{ $formIndikator === null ? 'Tambah Indikator' : 'Ubah Indikator' }}</h2>
 
+                <div class="mt-3 grid grid-cols-2 gap-3">
+                    <select wire:model.live="formMapel" aria-label="Mata pelajaran indikator" class="h-9 rounded border border-hairline-strong bg-surface px-3 text-[15px] text-body focus:border-accent focus:ring-2 focus:ring-accent/30 focus:outline-none">
+                        <option value="">Pilih mata pelajaran</option>
+                        @foreach ($this->daftarMapel as $mapel)
+                            <option value="{{ $mapel->getKey() }}">{{ $mapel->Nama_Mapel }}</option>
+                        @endforeach
+                    </select>
+                    <select wire:model.live="formProgram" aria-label="Program pengembangan" @disabled($formMapel === '') class="h-9 rounded border border-hairline-strong bg-surface px-3 text-[15px] text-body focus:border-accent focus:ring-2 focus:ring-accent/30 focus:outline-none disabled:bg-canvas disabled:text-muted">
+                        @foreach ($this->programForm as $program)
+                            <option value="{{ $program->getKey() }}">{{ $program->Nama_Program }}</option>
+                        @endforeach
+                        <option value="">+ Program baru</option>
+                    </select>
+                </div>
+
+                @if ($formMapel !== '' && blank($formProgram))
+                    <input type="text" wire:model="formProgramBaru" placeholder="Nama program pengembangan baru" aria-label="Nama program pengembangan baru"
+                        class="mt-3 h-9 w-full rounded border border-hairline-strong bg-surface px-3 text-[15px] text-body placeholder:text-placeholder focus:border-accent focus:ring-2 focus:ring-accent/30 focus:outline-none">
+                @endif
+
+                @error('formMapel') <p class="mt-2 text-[13px] text-rose-700">{{ $message }}</p> @enderror
+                @error('formProgram') <p class="mt-2 text-[13px] text-rose-700">{{ $message }}</p> @enderror
+                @error('formProgramBaru') <p class="mt-2 text-[13px] text-rose-700">{{ $message }}</p> @enderror
+
                 <div class="mt-3 grid grid-cols-[1fr_200px] gap-3">
                     <input type="text" wire:model="formDeskripsi" placeholder="Deskripsi indikator"
                         class="h-9 rounded border border-hairline-strong bg-surface px-3 text-[15px] text-body placeholder:text-placeholder focus:border-accent focus:ring-2 focus:ring-accent/30 focus:outline-none">
@@ -272,6 +361,8 @@ class extends \Livewire\Component
 
                 @error('formDeskripsi') <p class="mt-2 text-[13px] text-rose-700">{{ $message }}</p> @enderror
                 @error('formTipe') <p class="mt-2 text-[13px] text-rose-700">{{ $message }}</p> @enderror
+                @error('filterJenjang') <p class="mt-2 text-[13px] text-rose-700">{{ $message }}</p> @enderror
+                @error('filterSemester') <p class="mt-2 text-[13px] text-rose-700">{{ $message }}</p> @enderror
 
                 <div class="mt-3 flex justify-end gap-2">
                     <x-ui.button type="button" variant="ghost" wire:click="tutupForm">Batal</x-ui.button>
