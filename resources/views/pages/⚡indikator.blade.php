@@ -87,10 +87,32 @@ class extends \Livewire\Component
             ->values();
     }
 
+    /**
+     * The subjects whose indicators this teacher may change. Everyone may read
+     * every subject's indicators, but only its own teachers maintain them.
+     *
+     * @return Collection<int, MataPelajaran>
+     */
+    #[Computed]
+    public function mapelDikelola(): Collection
+    {
+        $user = auth()->user();
+
+        return MataPelajaran::query()
+            ->unless($user->Role_ID === 'ADMIN', fn ($query) => $query->whereIn('Mapel_ID', $user->pembelajaran()->select('Mapel_ID')))
+            ->orderBy('Nama_Mapel')
+            ->get();
+    }
+
+    public function bolehKelola(string $mapelId): bool
+    {
+        return $this->mapelDikelola->contains('Mapel_ID', $mapelId);
+    }
+
     public function tambah(): void
     {
         $this->reset('formIndikator', 'formDeskripsi', 'formTipe', 'formProgramBaru');
-        $this->formMapel = $this->filterMapel;
+        $this->formMapel = $this->bolehKelola($this->filterMapel) ? $this->filterMapel : '';
         $this->formProgram = $this->programForm->first()?->getKey();
         $this->formTerbuka = true;
     }
@@ -98,6 +120,8 @@ class extends \Livewire\Component
     public function ubah(string $indikatorId): void
     {
         $indikator = IndikatorCapaian::query()->with('program')->findOrFail($indikatorId);
+
+        abort_unless($this->bolehKelola($indikator->program->Mapel_ID), 403);
 
         $this->formIndikator = $indikator->getKey();
         $this->formMapel = $indikator->program->Mapel_ID;
@@ -146,7 +170,7 @@ class extends \Livewire\Component
         $baru = $this->formIndikator === null;
 
         $this->validate([
-            'formMapel' => ['required', Rule::exists('mata_pelajarans', 'Mapel_ID')],
+            'formMapel' => ['required', Rule::in($this->mapelDikelola->pluck('Mapel_ID'))],
             'formProgram' => [
                 'nullable',
                 'required_without:formProgramBaru',
@@ -161,6 +185,7 @@ class extends \Livewire\Component
             'filterSemester' => [Rule::requiredIf($baru)],
         ], [
             'formMapel.required' => 'Pilih mata pelajaran.',
+            'formMapel.in' => 'Anda tidak ditugaskan mengampu mata pelajaran ini.',
             'formProgram.required_without' => 'Pilih program pengembangan atau tulis nama program baru.',
             'formProgram.exists' => 'Program tidak termasuk mata pelajaran yang dipilih.',
             'formProgramBaru.required_without' => 'Pilih program pengembangan atau tulis nama program baru.',
@@ -187,7 +212,11 @@ class extends \Livewire\Component
                 'Semester' => $this->filterSemester,
             ]);
         } else {
-            IndikatorCapaian::query()->findOrFail($this->formIndikator)->update($data);
+            $indikator = IndikatorCapaian::query()->with('program')->findOrFail($this->formIndikator);
+
+            abort_unless($this->bolehKelola($indikator->program->Mapel_ID), 403);
+
+            $indikator->update($data);
         }
 
         // Show the subject the indicator was filed under, so it is never saved
@@ -200,7 +229,9 @@ class extends \Livewire\Component
 
     public function hapus(string $indikatorId): void
     {
-        $indikator = IndikatorCapaian::query()->findOrFail($indikatorId);
+        $indikator = IndikatorCapaian::query()->with('program')->findOrFail($indikatorId);
+
+        abort_unless($this->bolehKelola($indikator->program->Mapel_ID), 403);
 
         // The foreign key is restrictOnDelete, so an indicator carrying recorded
         // scores must not be removed; deleting it would discard student grades.
@@ -231,10 +262,11 @@ class extends \Livewire\Component
         $sumber = IndikatorCapaian::query()
             ->where('TahunAjaran_ID', $periode->getKey())
             ->where('Semester', $lalu)
-            ->when($this->filterMapel !== '', fn ($query) => $query->whereIn(
-                'Program_ID',
-                ProgramPengembangan::query()->where('Mapel_ID', $this->filterMapel)->select('Program_ID'),
-            ))
+            // Only subjects this teacher maintains, narrowed further by the filter.
+            ->whereIn('Program_ID', ProgramPengembangan::query()
+                ->whereIn('Mapel_ID', $this->mapelDikelola->pluck('Mapel_ID'))
+                ->when($this->filterMapel !== '', fn ($query) => $query->where('Mapel_ID', $this->filterMapel))
+                ->select('Program_ID'))
             ->when($this->filterJenjang !== '', fn ($query) => $query->where('Jenjang', $this->filterJenjang))
             ->when($this->filterTipe !== '', fn ($query) => $query->where('Tipe', $this->filterTipe))
             ->get();
@@ -327,7 +359,7 @@ class extends \Livewire\Component
                 <div class="mt-3 grid grid-cols-2 gap-3">
                     <select wire:model.live="formMapel" aria-label="Mata pelajaran indikator" class="h-9 rounded border border-hairline-strong bg-surface px-3 text-[15px] text-body focus:border-accent focus:ring-2 focus:ring-accent/30 focus:outline-none">
                         <option value="">Pilih mata pelajaran</option>
-                        @foreach ($this->daftarMapel as $mapel)
+                        @foreach ($this->mapelDikelola as $mapel)
                             <option value="{{ $mapel->getKey() }}">{{ $mapel->Nama_Mapel }}</option>
                         @endforeach
                     </select>
@@ -386,10 +418,12 @@ class extends \Livewire\Component
                                 <td class="px-4 py-3 text-[15px] text-body">{{ $indikator->Deskripsi }}</td>
                                 <td class="w-[110px] px-4 py-3 text-[14px] text-muted">{{ $indikator->Tipe->label() }}</td>
                                 <td class="w-[180px] px-4 py-3 text-right">
-                                    <div class="flex justify-end gap-2">
-                                        <x-ui.button type="button" variant="secondary" size="sm" wire:click="ubah('{{ $indikator->getKey() }}')">Ubah</x-ui.button>
-                                        <x-ui.button type="button" variant="danger" size="sm" wire:click="hapus('{{ $indikator->getKey() }}')" wire:confirm="Hapus indikator ini?">Hapus</x-ui.button>
-                                    </div>
+                                    @if ($this->bolehKelola($program->Mapel_ID))
+                                        <div class="flex justify-end gap-2">
+                                            <x-ui.button type="button" variant="secondary" size="sm" wire:click="ubah('{{ $indikator->getKey() }}')">Ubah</x-ui.button>
+                                            <x-ui.button type="button" variant="danger" size="sm" wire:click="hapus('{{ $indikator->getKey() }}')" wire:confirm="Hapus indikator ini?">Hapus</x-ui.button>
+                                        </div>
+                                    @endif
                                 </td>
                             </tr>
                         @endforeach

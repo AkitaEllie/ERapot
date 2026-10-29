@@ -113,3 +113,14 @@ it('menghapus foto dari layar input rapor', function (): void {
 
     expect($this->narasi->dokumentasi()->count())->toBe(0);
 });
+
+it('membuang berkas yang ditolak agar unggahan berikutnya tidak ikut gagal', function (): void {
+    Livewire::test('pages::rapor-input', ['rapor' => $this->rapor, 'mapel' => $this->mapel])
+        ->set('fotoBaru', [UploadedFile::fake()->create('bukan-gambar.jpg', 1, 'text/plain')])
+        ->assertHasErrors('fotoBaru.0')
+        ->assertSet('fotoBaru', [])
+        ->set('fotoBaru', [UploadedFile::fake()->image('kegiatan.jpg')])
+        ->assertHasNoErrors();
+
+    expect($this->narasi->dokumentasi()->count())->toBe(1);
+});

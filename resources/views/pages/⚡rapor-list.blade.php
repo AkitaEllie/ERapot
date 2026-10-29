@@ -50,8 +50,7 @@ class extends \Livewire\Component
     #[Computed]
     public function kelasDiaampu(): Collection
     {
-        return Kelas::query()
-            ->where('User_ID', auth()->id())
+        return auth()->user()->kelasDiajar()
             ->with('tahunAjaran')
             ->orderBy('Nama_Kelas')
             ->get();
@@ -73,8 +72,11 @@ class extends \Livewire\Component
             return collect();
         }
 
+        // A subject teacher fills in only their own subjects; the homeroom teacher
+        // owns every subject of their class.
         return Pembelajaran::query()
             ->where('Kelas_ID', $kelas->getKey())
+            ->when($kelas->User_ID !== auth()->id(), fn ($query) => $query->where('User_ID', auth()->id()))
             ->with('mataPelajaran')
             ->get()
             ->pluck('mataPelajaran')

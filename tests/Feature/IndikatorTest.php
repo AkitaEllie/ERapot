@@ -8,8 +8,10 @@ use App\Models\Kelas;
 use App\Models\MataPelajaran;
 use App\Models\Narasi;
 use App\Models\NilaiSiswa;
+use App\Models\Pembelajaran;
 use App\Models\ProgramPengembangan;
 use App\Models\Rapor;
+use App\Models\Role;
 use App\Models\Siswa;
 use App\Models\TahunAjaran;
 use App\Models\User;
@@ -19,7 +21,10 @@ use Livewire\Livewire;
 uses(RefreshDatabase::class);
 
 beforeEach(function (): void {
-    $this->guru = User::factory()->create();
+    // These tests cover the screen itself, so they act as an administrator, who
+    // may maintain every subject; the per-teacher limits are tested below.
+    Role::factory()->bawaan('ADMIN')->create();
+    $this->guru = User::factory()->create(['Role_ID' => 'ADMIN']);
     $this->actingAs($this->guru);
 
     TahunAjaran::factory()->create(['Is_Active' => true, 'Tahun_Ajaran' => '2025/2026']);
@@ -267,4 +272,76 @@ it('mempertahankan jenjang dan semester saat indikator diubah', function (): voi
     expect($indikator->Deskripsi)->toBe('Deskripsi diperbarui')
         ->and($indikator->Jenjang)->toBe(Jenjang::Tkb)
         ->and($indikator->Semester)->toBe(Semester::Genap);
+});
+
+describe('guru mata pelajaran', function (): void {
+    beforeEach(function (): void {
+        Role::factory()->bawaan('GURU')->create();
+        $this->guruMapel = User::factory()->create(['Role_ID' => 'GURU']);
+        $this->mapelSendiri = MataPelajaran::factory()->create(['Tampilkan_Indikator' => true]);
+        Pembelajaran::factory()->create(['Mapel_ID' => $this->mapelSendiri->getKey(), 'User_ID' => $this->guruMapel->getKey()]);
+
+        $programLain = ProgramPengembangan::factory()->create([
+            'Mapel_ID' => MataPelajaran::factory()->create(['Tampilkan_Indikator' => true])->getKey(),
+        ]);
+        $this->indikatorLain = IndikatorCapaian::factory()->create([
+            'Program_ID' => $programLain->getKey(),
+            'TahunAjaran_ID' => TahunAjaran::query()->where('Is_Active', true)->firstOrFail()->getKey(),
+            'Deskripsi' => 'Indikator milik guru lain',
+        ]);
+
+        $this->actingAs($this->guruMapel);
+    });
+
+    it('menampilkan indikator mata pelajaran lain tanpa tombol ubah dan hapus', function (): void {
+        Livewire::test('pages::indikator')
+            ->assertSee('Indikator milik guru lain')
+            ->assertDontSeeHtml("ubah('{$this->indikatorLain->getKey()}')")
+            ->assertDontSeeHtml("hapus('{$this->indikatorLain->getKey()}')");
+    });
+
+    it('menolak menghapus indikator mata pelajaran lain', function (): void {
+        Livewire::test('pages::indikator')
+            ->call('hapus', $this->indikatorLain->getKey())
+            ->assertForbidden();
+
+        expect(IndikatorCapaian::query()->find($this->indikatorLain->getKey()))->not->toBeNull();
+    });
+
+    it('menolak mengubah indikator mata pelajaran lain', function (): void {
+        Livewire::test('pages::indikator')
+            ->call('ubah', $this->indikatorLain->getKey())
+            ->assertForbidden();
+    });
+
+    it('menolak menambah indikator ke mata pelajaran lain', function (): void {
+        Livewire::test('pages::indikator')
+            ->set('filterJenjang', Jenjang::Tka->value)
+            ->set('filterSemester', Semester::Ganjil->value)
+            ->call('tambah')
+            ->set('formMapel', $this->indikatorLain->program->Mapel_ID)
+            ->set('formProgram', $this->indikatorLain->Program_ID)
+            ->set('formDeskripsi', 'Disisipkan ke mapel lain')
+            ->set('formTipe', TipeIndikator::Capaian->value)
+            ->call('simpan')
+            ->assertHasErrors(['formMapel' => 'in'])
+            ->assertSee('Anda tidak ditugaskan mengampu mata pelajaran ini.');
+
+        expect(IndikatorCapaian::query()->where('Deskripsi', 'Disisipkan ke mapel lain')->exists())->toBeFalse();
+    });
+
+    it('menambah indikator ke mata pelajaran yang diampunya', function (): void {
+        Livewire::test('pages::indikator')
+            ->set('filterJenjang', Jenjang::Tka->value)
+            ->set('filterSemester', Semester::Ganjil->value)
+            ->call('tambah')
+            ->set('formMapel', $this->mapelSendiri->getKey())
+            ->set('formProgramBaru', 'Program sendiri')
+            ->set('formDeskripsi', 'Indikator sendiri')
+            ->set('formTipe', TipeIndikator::Capaian->value)
+            ->call('simpan')
+            ->assertHasNoErrors();
+
+        expect(IndikatorCapaian::query()->where('Deskripsi', 'Indikator sendiri')->exists())->toBeTrue();
+    });
 });

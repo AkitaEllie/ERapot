@@ -5,6 +5,7 @@ use App\Enums\Semester;
 use App\Enums\TipeIndikator;
 use App\Models\IndikatorCapaian;
 use App\Models\MataPelajaran;
+use App\Models\Pembelajaran;
 use App\Models\ProgramPengembangan;
 use App\Models\Role;
 use App\Models\TahunAjaran;
@@ -24,6 +25,7 @@ beforeEach(function (): void {
     ]);
     $this->mapel = MataPelajaran::factory()->create();
     $this->program = ProgramPengembangan::factory()->create(['Mapel_ID' => $this->mapel->getKey()]);
+    Pembelajaran::factory()->create(['Mapel_ID' => $this->mapel->getKey(), 'User_ID' => $this->guru->getKey()]);
 
     $this->actingAs($this->guru);
 });
@@ -121,4 +123,19 @@ it('menyalin dari semester lalu ke semester aktif setelah berganti semester', fu
 
     expect(IndikatorCapaian::query()->where('Semester', Semester::Genap)->pluck('Deskripsi')->all())
         ->toBe(['Dari semester lalu']);
+});
+
+it('hanya menyalin indikator mata pelajaran yang diampu guru', function (): void {
+    indikatorLama(Semester::Genap, null, 'Indikator-milik-sendiri');
+    $programLain = ProgramPengembangan::factory()->create([
+        'Mapel_ID' => MataPelajaran::factory()->create()->getKey(),
+    ]);
+    indikatorLama(Semester::Genap, $programLain, 'Indikator-guru-lain');
+
+    Livewire::test('pages::indikator')
+        ->call('salinSemesterLalu')
+        ->assertSee('1 indikator disalin dari semester Genap');
+
+    expect(IndikatorCapaian::query()->where('Semester', Semester::Ganjil)->pluck('Deskripsi')->all())
+        ->toBe(['Indikator-milik-sendiri']);
 });

@@ -17,6 +17,7 @@ use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Storage;
 use Symfony\Component\HttpKernel\Exception\HttpException;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Layout;
 use Livewire\WithFileUploads;
@@ -284,14 +285,22 @@ class extends \Livewire\Component
             return;
         }
 
-        $this->validate(
-            ['fotoBaru.*' => ['image', 'mimes:jpg,jpeg,png', 'max:2048']],
-            [
-                'fotoBaru.*.image' => 'Format atau ukuran file tidak sesuai (jpg/jpeg/png, maks. 2MB).',
-                'fotoBaru.*.mimes' => 'Format atau ukuran file tidak sesuai (jpg/jpeg/png, maks. 2MB).',
-                'fotoBaru.*.max' => 'Format atau ukuran file tidak sesuai (jpg/jpeg/png, maks. 2MB).',
-            ],
-        );
+        try {
+            $this->validate(
+                ['fotoBaru.*' => ['image', 'mimes:jpg,jpeg,png', 'max:2048']],
+                [
+                    'fotoBaru.*.image' => 'Format atau ukuran file tidak sesuai (jpg/jpeg/png, maks. 2MB).',
+                    'fotoBaru.*.mimes' => 'Format atau ukuran file tidak sesuai (jpg/jpeg/png, maks. 2MB).',
+                    'fotoBaru.*.max' => 'Format atau ukuran file tidak sesuai (jpg/jpeg/png, maks. 2MB).',
+                ],
+            );
+        } catch (ValidationException $e) {
+            // Drop the rejected files, otherwise they are validated again with
+            // every later upload and block a valid photo.
+            $this->fotoBaru = [];
+
+            throw $e;
+        }
 
         $narasi = $this->ensureNarasi();
 

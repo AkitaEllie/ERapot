@@ -18,6 +18,23 @@ class extends Component
     public string $Kelas_ID = '';
 
     /**
+     * Every role lands here after login; staff without a teaching dashboard are
+     * sent on to their own, the same targets the sidebar links to.
+     */
+    public function mount(): void
+    {
+        $tujuan = match (auth()->user()->Role_ID) {
+            'TATAUSA' => 'dashboard.tata-usaha',
+            'KEPSEKOL' => 'dashboard.kepsekol',
+            default => null,
+        };
+
+        if ($tujuan !== null) {
+            $this->redirectRoute($tujuan, navigate: true);
+        }
+    }
+
+    /**
      * The school year the teacher is working in.
      */
     #[Computed]
@@ -39,8 +56,7 @@ class extends Component
     {
         $user = auth()->user();
 
-        return Kelas::query()
-            ->where('User_ID', $user->getKey())
+        return $user->kelasDiajar()
             ->when($this->tahunAjaran, fn ($query) => $query->where('TahunAjaran_ID', $this->tahunAjaran->getKey()))
             ->withCount([
                 'rapor as disetujui' => fn ($query) => $query->where('Status', RaporStatus::Disetujui->value),
@@ -50,7 +66,12 @@ class extends Component
             ->get()
             ->map(fn (Kelas $kelas): array => [
                 'kelas' => $kelas,
-                'mapel' => $kelas->pembelajaran->first()?->mataPelajaran?->Nama_Mapel,
+                // Only the subjects this teacher is assigned, never someone else's.
+                'mapel' => $kelas->pembelajaran
+                    ->where('User_ID', $user->getKey())
+                    ->map(fn ($pembelajaran) => $pembelajaran->mataPelajaran?->Nama_Mapel)
+                    ->filter()
+                    ->join(', ') ?: null,
                 'siswa' => $kelas->rapor()->distinct('Siswa_ID')->count('Siswa_ID'),
                 'disetujui' => (int) $kelas->disetujui,
                 'total' => (int) $kelas->rapor_count,
@@ -65,7 +86,7 @@ class extends Component
     #[Computed]
     public function perluDitindaklanjuti(): Collection
     {
-        $kelasIds = auth()->user()->kelasDiampu()->pluck('Kelas_ID');
+        $kelasIds = auth()->user()->kelasDiajar()->pluck('Kelas_ID');
 
         return Rapor::query()
             ->whereIn('Kelas_ID', $kelasIds)
@@ -79,7 +100,7 @@ class extends Component
     #[Computed]
     public function ringkasan(): array
     {
-        $kelasIds = auth()->user()->kelasDiampu()->pluck('Kelas_ID');
+        $kelasIds = auth()->user()->kelasDiajar()->pluck('Kelas_ID');
         $rapor = Rapor::query()->whereIn('Kelas_ID', $kelasIds);
 
         return [

@@ -160,3 +160,66 @@ describe('dashboard kepala sekolah', function (): void {
             ->assertSee(route('review-rapor', ['rapor' => $rapor->getKey()]), escape: false);
     });
 });
+
+describe('pengalihan dashboard setelah login', function (): void {
+    it('mengarahkan peran tanpa dashboard guru ke dashboardnya sendiri', function (string $peran, string $tujuan): void {
+        TahunAjaran::factory()->create(['Is_Active' => true, 'Semester_Aktif' => Semester::Ganjil]);
+        $user = User::factory()->create(['Role_ID' => buatRole($peran)->getKey()]);
+
+        $this->actingAs($user)
+            ->get(route('dashboard'))
+            ->assertRedirect(route($tujuan));
+    })->with([
+        'tata usaha' => ['TATAUSA', 'dashboard.tata-usaha'],
+        'kepala sekolah' => ['KEPSEKOL', 'dashboard.kepsekol'],
+    ]);
+
+    it('menampilkan dashboard guru kepada guru', function (): void {
+        TahunAjaran::factory()->create(['Is_Active' => true, 'Semester_Aktif' => Semester::Ganjil]);
+        $guru = User::factory()->create(['Role_ID' => buatRole('GURU')->getKey()]);
+
+        $this->actingAs($guru)
+            ->get(route('dashboard'))
+            ->assertOk()
+            ->assertSee('Kelas yang Diampu');
+    });
+});
+
+describe('dashboard guru', function (): void {
+    beforeEach(function (): void {
+        $this->periode = TahunAjaran::factory()->create(['Is_Active' => true, 'Semester_Aktif' => Semester::Ganjil]);
+        $this->wali = User::factory()->create(['Role_ID' => buatRole('GURUWALI')->getKey()]);
+        $this->guruMapel = User::factory()->create(['Role_ID' => buatRole('GURU')->getKey()]);
+        $this->kelas = Kelas::factory()->create([
+            'TahunAjaran_ID' => $this->periode->getKey(),
+            'User_ID' => $this->wali->getKey(),
+            'Nama_Kelas' => 'TK-A Respect',
+        ]);
+
+        $agama = MataPelajaran::factory()->create(['Nama_Mapel' => 'Nilai-nilai Agama & Budi Pekerti']);
+        $inggris = MataPelajaran::factory()->create(['Nama_Mapel' => 'Bahasa Inggris']);
+        Pembelajaran::factory()->create(['Kelas_ID' => $this->kelas->getKey(), 'Mapel_ID' => $agama->getKey(), 'User_ID' => $this->wali->getKey()]);
+        Pembelajaran::factory()->create(['Kelas_ID' => $this->kelas->getKey(), 'Mapel_ID' => $inggris->getKey(), 'User_ID' => $this->guruMapel->getKey()]);
+
+        raporStatus($this->kelas, RaporStatus::Draft);
+    });
+
+    it('menghitung kelas tempat guru mata pelajaran mengajar', function (): void {
+        $dashboard = Livewire::actingAs($this->guruMapel)->test('pages::dashboard');
+
+        expect($dashboard->instance()->ringkasan['kelas'])->toBe(1);
+
+        $dashboard
+            ->assertSee('TK-A Respect')
+            ->assertSee('Bahasa Inggris')
+            ->assertDontSee('Nilai-nilai Agama');
+    });
+
+    it('menampilkan hanya mata pelajaran milik wali kelas sendiri', function (): void {
+        Livewire::actingAs($this->wali)
+            ->test('pages::dashboard')
+            ->assertSee('TK-A Respect')
+            ->assertSee('Nilai-nilai Agama')
+            ->assertDontSee('Bahasa Inggris');
+    });
+});
