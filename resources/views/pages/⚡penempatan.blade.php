@@ -53,7 +53,7 @@ class extends \Livewire\Component
 
     public function kelasTujuan(): ?Kelas
     {
-        return $this->daftarKelas->firstWhere('getKey', $this->kelasTujuan) ?? $this->daftarKelas->first();
+        return $this->daftarKelas->firstWhere('Kelas_ID', $this->kelasTujuan) ?? $this->daftarKelas->first();
     }
 
     /** @return Collection<int, Siswa> */

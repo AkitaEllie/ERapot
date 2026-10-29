@@ -21,13 +21,13 @@
     <body class="bg-canvas font-sans text-body antialiased">
         {{-- The sidebar lives in the layout so every screen gets the same shell; pages
              pass their own active key through the #[Layout] attribute. --}}
-        <div class="flex h-screen overflow-hidden">
+        <div class="flex h-screen overflow-hidden print:block print:h-auto print:overflow-visible">
             <x-app.sidebar :active="$active ?? 'dashboard'" />
 
             {{-- Livewire wraps the page in its own root element, so this column has to
                  carry the flex sizing: without it the wrapper is a block box sized by
                  its content, and a page's `flex-1 overflow-y-auto` never resolves. --}}
-            <div class="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden [&>*]:flex [&>*]:min-h-0 [&>*]:flex-1 [&>*]:flex-col [&>*]:overflow-hidden">
+            <div class="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden [&>*]:flex [&>*]:min-h-0 [&>*]:flex-1 [&>*]:flex-col [&>*]:overflow-hidden print:block print:overflow-visible print:[&>*]:block print:[&>*]:overflow-visible">
                 {{ $slot }}
             </div>
         </div>

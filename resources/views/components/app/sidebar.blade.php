@@ -35,8 +35,7 @@
         default => 'PENGGUNA',
     };
 
-    // Sidebar entries map to the built screens; screens that do not exist
-    // yet keep a null target and render as disabled placeholders.
+    // Sidebar entries map to the built screens.
     $targets = [
         'indikator' => fn (): string => route('indikator'),
         'rapor' => fn (): string => route('rapor.index'),
@@ -45,7 +44,7 @@
         'siswa' => fn (): string => route('siswa.index'),
         'penempatan' => fn (): string => route('penempatan'),
         'review' => fn (): string => route('review-rapor'),
-        'persetujuan' => fn (): string => route('review-rapor'),
+        'persetujuan' => fn (): string => route('persetujuan-rapor'),
         'ekspor' => fn (): string => route('ekspor-rapor'),
         'tahun-ajaran' => fn (): string => route('tahun-ajaran'),
         'pengguna' => fn (): string => route('pengguna'),
@@ -69,7 +68,7 @@
     ];
 @endphp
 
-<aside class="flex h-screen w-60 shrink-0 flex-col border-r border-hairline bg-surface">
+<aside class="flex h-screen w-60 shrink-0 flex-col border-r border-hairline bg-surface print:hidden">
     <div class="flex items-center gap-3 px-6 pt-7 pb-6">
         <img src="/images/logo-tk-cktc.png" alt="" class="size-10 rounded-lg object-contain">
         <div class="leading-tight">

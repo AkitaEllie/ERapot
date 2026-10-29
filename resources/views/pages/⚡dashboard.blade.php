@@ -146,7 +146,7 @@ class extends Component
                                         </div>
                                     </td>
                                     <td class="px-4 py-4">
-                                        <x-ui.button size="sm" variant="secondary">Isi Rapor</x-ui.button>
+                                        <x-ui.button-link size="sm" :href="route('rapor.index', ['kelas' => $row['kelas']->getKey()])">Isi Rapor</x-ui.button-link>
                                     </td>
                                 </tr>
                             @empty
@@ -177,7 +177,8 @@ class extends Component
                                         perlu diperbaiki: {{ $rapor->Catatan_Revisi }}
                                     </p>
                                 </div>
-                                <x-ui.button variant="secondary">Buka Rapor</x-ui.button>
+                                @php $mapelPertama = $rapor->narasi->first()?->Mapel_ID ?? $rapor->mataPelajaranRapor()->value('Mapel_ID'); @endphp
+                                <x-ui.button-link :href="$mapelPertama ? route('rapor.input', ['rapor' => $rapor->getKey(), 'mapel' => $mapelPertama]) : route('rapor.data-fisik', $rapor)">Buka Rapor</x-ui.button-link>
                             </div>
                         @endforeach
                     </div>

@@ -1,6 +1,6 @@
 @props(['title', 'subtitle' => null])
 
-<header class="flex h-[72px] shrink-0 items-center justify-between border-b border-hairline bg-surface pr-16 pl-8">
+<header class="flex h-[72px] shrink-0 items-center justify-between border-b border-hairline bg-surface pr-16 pl-8 print:hidden">
     <div class="leading-tight">
         <h1 class="text-[22px] font-semibold text-heading">{{ $title }}</h1>
         @if ($subtitle)
@@ -20,7 +20,7 @@
         </button>
 
         {{-- Profile popout: gives the signed-in identity a place to hold the logout action. --}}
-        <div class="relative" x-data="{ terbuka: false }" @keydown.escape.window="terbuka = false">
+        <div class="relative" x-data="{ terbuka: false, keluar: false }" @keydown.escape.window="terbuka = false; keluar = false">
             <button
                 type="button"
                 class="flex items-center gap-3 rounded-lg px-2 py-1 transition-colors hover:bg-sunken"
@@ -51,7 +51,7 @@
                     <p class="mt-1 text-[12px] text-placeholder">{{ auth()->user()?->role?->Nama_Role }}</p>
                 </div>
 
-                <form method="POST" action="{{ route('logout') }}" class="p-1.5">
+                <form id="form-keluar" method="POST" action="{{ route('logout') }}" class="p-1.5">
                     <a
                         href="{{ route('profil') }}"
                         role="menuitem"
@@ -63,8 +63,10 @@
                         Profil Saya
                     </a>
                     @csrf
+                    {{-- Signing out asks first (wireframe U-02): unsaved report edits would be lost. --}}
                     <button
-                        type="submit"
+                        type="button"
+                        @click="terbuka = false; keluar = true"
                         role="menuitem"
                         class="flex w-full items-center gap-2.5 rounded px-2.5 py-2 text-left text-[15px] text-body transition-colors hover:bg-sunken"
                     >
@@ -74,6 +76,25 @@
                         Keluar
                     </button>
                 </form>
+            </div>
+
+            <div
+                x-cloak
+                x-show="keluar"
+                x-transition.opacity
+                class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-6"
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby="judul-keluar"
+            >
+                <div class="w-full max-w-[440px] rounded-xl bg-surface px-7 py-6 shadow-lg" @click.outside="keluar = false">
+                    <h2 id="judul-keluar" class="text-[18px] font-semibold text-heading">Keluar dari akun?</h2>
+                    <p class="mt-1 text-[14px] text-muted">Perubahan yang belum disimpan akan hilang. Anda perlu login kembali untuk mengakses website e-Rapor.</p>
+                    <div class="mt-6 flex justify-end gap-3">
+                        <x-ui.button type="button" variant="secondary" @click="keluar = false">Batal</x-ui.button>
+                        <x-ui.button type="submit" form="form-keluar" variant="primary">Keluar</x-ui.button>
+                    </div>
+                </div>
             </div>
         </div>
     </div>

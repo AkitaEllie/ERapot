@@ -13,11 +13,6 @@ class extends \Livewire\Component
 {
     public Rapor $rapor;
 
-    public function cetak(): void
-    {
-        session()->flash('galat', 'Cetak belum diimplementasikan.');
-    }
-
     /**
      * Export the report and hand the file to the browser.
      *
@@ -52,6 +47,17 @@ class extends \Livewire\Component
     }
 
     /**
+     * The principal reads the whole report from Persetujuan Rapor, but does not
+     * export it: printing is the teachers' job.
+     */
+    #[Computed]
+    public function kepalaSekolah(): bool
+    {
+        return (bool) auth()->user()?->role?->punyaHakAkses('persetujuan')
+            && ! auth()->user()?->role?->punyaHakAkses('ekspor');
+    }
+
+    /**
      * The report's subject groups, narrowed to what this viewer may see.
      *
      * @return array{intrakurikuler: Collection<int, array{mapel: \App\Models\MataPelajaran, narasi: ?\App\Models\Narasi, pengampu: ?\App\Models\User}>, kokurikuler: Collection<int, array{mapel: \App\Models\MataPelajaran, narasi: ?\App\Models\Narasi, pengampu: ?\App\Models\User}>, tabel: Collection<int, array{mapel: \App\Models\MataPelajaran, narasi: ?\App\Models\Narasi, pengampu: ?\App\Models\User}>}
@@ -61,7 +67,7 @@ class extends \Livewire\Component
     {
         $seksi = $this->rapor->seksi();
 
-        if ($this->waliKelas) {
+        if ($this->waliKelas || $this->kepalaSekolah) {
             return $seksi;
         }
 
@@ -102,6 +108,7 @@ class extends \Livewire\Component
         $seksi = $this->seksi;
 
         return $this->waliKelas
+            || $this->kepalaSekolah
             || $seksi['intrakurikuler']->isNotEmpty()
             || $seksi['kokurikuler']->isNotEmpty()
             || $seksi['tabel']->isNotEmpty();
@@ -127,32 +134,35 @@ class extends \Livewire\Component
     >
         <x-slot:actions>
             <x-ui.badge :status="$rapor->Status">{{ $rapor->Status->label() }}</x-ui.badge>
-            <x-ui.button type="button" variant="secondary" wire:click="cetak">Cetak</x-ui.button>
-            <x-ui.button type="button" variant="primary" wire:click="exportPdf">Export PDF</x-ui.button>
+            @if ($this->kepalaSekolah)
+                <x-ui.button-link :href="route('persetujuan-rapor')">Kembali</x-ui.button-link>
+            @else
+                {{-- Prints the document as shown; the app shell is hidden in print. --}}
+                <x-ui.button type="button" variant="secondary" x-on:click="window.print()" :disabled="! $this->siapCetak">Cetak</x-ui.button>
+                <x-ui.button type="button" variant="primary" wire:click="exportPdf">Export PDF</x-ui.button>
+            @endif
         </x-slot:actions>
     </x-app.header>
 
     @if (! $this->siapCetak)
-        <div class="flex items-center gap-3 border-b border-hairline bg-notice-bg px-8 py-2.5 text-[14px] text-label">
+        <div class="flex items-center print:hidden gap-3 border-b border-hairline bg-notice-bg px-8 py-2.5 text-[14px] text-label">
             <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" class="size-5 shrink-0" aria-hidden="true">
                 <circle cx="10" cy="10" r="7.5"/><path d="M10 6.5v4.2M10 13.4h.01" stroke-linecap="round"/>
             </svg>
-            Rapor belum disetujui Kepala Sekolah, file PDF belum bisa diunduh (kondisi alternatif)
+            Rapor belum disetujui Kepala Sekolah, file PDF belum bisa diunduh.
         </div>
     @endif
 
-    @if (session('galat'))
-        <div class="border-b border-hairline bg-rose-50 px-8 py-2.5 text-[14px] text-rose-800">{{ session('galat') }}</div>
-    @endif
+    <div class="print:hidden"><x-ui.flash /></div>
 
-    <div class="flex-1 overflow-y-auto bg-canvas px-8 py-6">
+    <div class="flex-1 overflow-y-auto bg-canvas px-8 py-6 print:overflow-visible print:bg-white print:p-0">
         @if (! $this->adaIsi)
             <p class="mx-auto w-[794px] bg-white px-[56px] py-[56px] text-center text-[14px] text-muted shadow-sm ring-1 ring-hairline">
                 Tidak ada mata pelajaran yang bisa Anda lihat pada rapor ini.
             </p>
         @else
             {{-- Rendered at A4 proportions so the preview matches the exported file. --}}
-            <article class="mx-auto w-[794px] bg-white px-[56px] py-[56px] text-[13px] leading-relaxed text-[#111] shadow-sm ring-1 ring-hairline">
+            <article class="mx-auto w-[794px] bg-white px-[56px] py-[56px] text-[13px] leading-relaxed text-[#111] shadow-sm ring-1 ring-hairline print:shadow-none print:ring-0">
                 <x-rapor.dokumen
                     :rapor="$rapor"
                     :identitas="$this->waliKelas"

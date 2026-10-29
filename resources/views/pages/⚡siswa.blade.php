@@ -103,10 +103,6 @@ class extends \Livewire\Component
         session()->flash('galat', 'Import Excel belum diimplementasikan.');
     }
 
-    public function tambahSiswa(): void
-    {
-        session()->flash('galat', 'Form tambah siswa belum diimplementasikan.');
-    }
 };
 
 ?>
@@ -118,13 +114,11 @@ class extends \Livewire\Component
     >
         <x-slot:actions>
             <x-ui.button type="button" variant="secondary" wire:click="importExcel">Import Excel</x-ui.button>
-            <x-ui.button type="button" variant="primary" wire:click="tambahSiswa">Tambah Siswa</x-ui.button>
+            <x-ui.button-link :href="route('siswa.tambah')" variant="primary">Tambah Siswa</x-ui.button-link>
         </x-slot:actions>
     </x-app.header>
 
-    @if (session('galat'))
-        <div class="border-b border-hairline bg-notice-bg px-8 py-2.5 text-[14px] text-label">{{ session('galat') }}</div>
-    @endif
+    <x-ui.flash />
 
     <div class="flex shrink-0 items-center gap-4 border-b border-hairline bg-surface px-8 py-4">
         <input type="search" wire:model.live.debounce.400ms="cari" placeholder="Cari nama atau NISN..."
@@ -176,7 +170,7 @@ class extends \Livewire\Component
                             </td>
                             <td class="px-4 py-3"><x-ui.badge :status="$this->statusRapor($siswa)">{{ $this->statusRapor($siswa)->label() }}</x-ui.badge></td>
                             <td class="px-4 py-3 text-right">
-                                <x-ui.button type="button" variant="secondary" size="sm">Detail / Ubah</x-ui.button>
+                                <x-ui.button-link :href="route('siswa.ubah', $siswa)" size="sm">Detail / Ubah</x-ui.button-link>
                             </td>
                         </tr>
                     @empty

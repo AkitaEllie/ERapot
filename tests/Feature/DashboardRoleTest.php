@@ -143,7 +143,7 @@ describe('dashboard kepala sekolah', function (): void {
             ->assertSee('2 / 4 rapor selesai');
     });
 
-    it('membuka rincian rapor tiap siswa saat kartu kelas diklik', function (): void {
+    it('membuka rincian rapor tiap siswa lewat Lihat Detail', function (): void {
         $kelas = Kelas::factory()->create(['TahunAjaran_ID' => $this->periode->getKey()]);
         $rapor = raporStatus($kelas, RaporStatus::Menunggu);
         $rapor->siswa->update(['Nama' => 'Andini Pratiwi']);
@@ -152,8 +152,11 @@ describe('dashboard kepala sekolah', function (): void {
 
         Livewire::test('pages::dashboard-kepsekol')
             ->assertDontSee('Andini Pratiwi')
-            ->call('lihatDetail', $kelas->getKey())
+            ->assertSee(route('dashboard.kepsekol.kelas', $kelas), escape: false);
+
+        Livewire::test('pages::progres-kelas', ['kelas' => $kelas])
             ->assertSee('Andini Pratiwi')
-            ->assertSee('Menunggu');
+            ->assertSee('Menunggu')
+            ->assertSee(route('review-rapor', ['rapor' => $rapor->getKey()]), escape: false);
     });
 });

@@ -84,11 +84,17 @@ class TahunAjaran extends Model
     /**
      * Make this the active school year.
      *
-     * @todo Implement per the class diagram.
+     * Only one period may be active, because every screen reads "the" active
+     * period to decide which classes and reports it shows. The switch happens in a
+     * transaction so there is never a moment with two, or none, active.
      */
     public function aktifkan(): void
     {
-        //
+        static::getConnection()->transaction(function (): void {
+            static::query()->whereKeyNot($this->getKey())->update(['Is_Active' => false]);
+
+            $this->forceFill(['Is_Active' => true])->save();
+        });
     }
 
     /**

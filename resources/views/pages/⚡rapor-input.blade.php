@@ -3,6 +3,7 @@
 use App\Enums\Nilai;
 use App\Enums\StatusNarasi;
 use App\Exceptions\NarasiTidakTersedia;
+use App\Livewire\Concerns\MengajukanRapor;
 use App\Models\Dokumentasi;
 use App\Models\IndikatorCapaian;
 use App\Models\MataPelajaran;
@@ -23,7 +24,7 @@ use Livewire\WithFileUploads;
 new #[Layout('layouts::app', ['active' => 'rapor'])]
 class extends \Livewire\Component
 {
-    use WithFileUploads;
+    use MengajukanRapor, WithFileUploads;
 
     public Rapor $rapor;
 
@@ -102,37 +103,108 @@ class extends \Livewire\Component
 
     public function simpanDraft(): void
     {
-        $narasi = $this->ensureNarasi();
-        $this->simpanNilaiDanCatatan();
-        $narasi->simpanDraft($this->draftNarasi);
+        if ($this->terkunci()) {
+            return;
+        }
 
-        session()->flash('sukses', 'Draf rapor tersimpan.');
+        $this->simpanTabIni();
+
+        session()->flash('sukses', 'Data rapor berhasil disimpan.');
     }
 
+    /**
+     * Save the narrative the teacher has reviewed and edited by hand, the last
+     * step of the human-in-the-loop flow.
+     */
+    public function simpanNarasi(): void
+    {
+        if ($this->terkunci()) {
+            return;
+        }
+
+        $this->validate(['draftNarasi' => ['required', 'string']], [
+            'draftNarasi.required' => 'Narasi masih kosong. Tekan Generate Narasi atau tulis narasinya sendiri.',
+        ]);
+
+        $narasi = $this->ensureNarasi();
+        $this->simpanNilaiDanCatatan();
+        $narasi->editNarasi($this->draftNarasi);
+        $this->rapor->tandaiSedangDiisi();
+        unset($this->narasi);
+
+        session()->flash('sukses', 'Narasi berhasil disimpan.');
+    }
+
+    /**
+     * Submit the report. The open tab's ratings must be complete first; the
+     * rest of the report is checked by the submit dialog.
+     */
     public function ajukan(): void
     {
         $this->validate([
-            'nilai' => ['required', 'array'],
+            'nilai' => ['array'],
             'nilai.*' => ['required', Rule::enum(Nilai::class)],
         ], [], ['nilai' => 'pilihan sikap']);
 
+        // Every indicator on this tab needs a rating; a subject without
+        // indicators has nothing to rate and goes straight to the check.
+        $belumDinilai = $this->program
+            ->flatMap(fn (ProgramPengembangan $program): Collection => $program->indikatorCapaian)
+            ->reject(fn (IndikatorCapaian $indikator): bool => filled($this->nilai[$indikator->getKey()] ?? null))
+            ->count();
+
+        if ($belumDinilai > 0) {
+            $this->addError('nilai', $belumDinilai.' indikator pada tab ini belum dinilai (MB, BSH, atau BSB).');
+
+            return;
+        }
+
+        $this->periksaPengajuan();
+    }
+
+    protected function simpanTabIni(): void
+    {
         $narasi = $this->ensureNarasi();
         $this->simpanNilaiDanCatatan();
-        $narasi->simpanDraft($this->draftNarasi);
 
-        $this->rapor->ajukanPersetujuan();
+        if ($this->draftNarasi !== (string) $narasi->Draft_Narasi) {
+            $narasi->editNarasi($this->draftNarasi);
+        }
 
-        session()->flash('sukses', 'Rapor diajukan untuk persetujuan kepala sekolah.');
+        $this->rapor->tandaiSedangDiisi();
+        unset($this->narasi);
+    }
+
+    private function terkunci(): bool
+    {
+        if ($this->rapor->bolehDiubah()) {
+            return false;
+        }
+
+        session()->flash('galat', 'Rapor sedang menunggu persetujuan atau sudah disetujui, sehingga tidak dapat diubah.');
+
+        return true;
     }
 
     public function generateNarasi(): void
     {
+        if ($this->terkunci()) {
+            return;
+        }
+
         $this->simpanNilaiDanCatatan();
 
+        unset($this->narasi);
         $narasi = $this->narasi;
 
         if (! $narasi instanceof Narasi) {
             session()->flash('galat', 'Belum ada narasi untuk mata pelajaran ini.');
+
+            return;
+        }
+
+        if ($narasi->nilaiSiswa->isEmpty() && blank($narasi->Catatan_Guru)) {
+            session()->flash('galat', 'Data belum lengkap: nilai indikator atau catatan personal guru belum diisi.');
 
             return;
         }
@@ -147,7 +219,12 @@ class extends \Livewire\Component
             return;
         }
 
+        // The draft is stored straight away, so a refresh does not lose it; the
+        // teacher still reviews and edits it before saving the narrative.
+        $narasi->simpanDraft($hasil);
+        $this->rapor->tandaiSedangDiisi();
         $this->draftNarasi = $hasil;
+        unset($this->narasi);
     }
 
     public function hapusFoto(string $dokumentasiId): void
@@ -188,6 +265,21 @@ class extends \Livewire\Component
 
     private function simpanFotoBaru(): void
     {
+        if ($this->terkunci()) {
+            $this->fotoBaru = [];
+
+            return;
+        }
+
+        $this->validate(
+            ['fotoBaru.*' => ['image', 'mimes:jpg,jpeg,png', 'max:2048']],
+            [
+                'fotoBaru.*.image' => 'Format atau ukuran file tidak sesuai (jpg/jpeg/png, maks. 2MB).',
+                'fotoBaru.*.mimes' => 'Format atau ukuran file tidak sesuai (jpg/jpeg/png, maks. 2MB).',
+                'fotoBaru.*.max' => 'Format atau ukuran file tidak sesuai (jpg/jpeg/png, maks. 2MB).',
+            ],
+        );
+
         $narasi = $this->ensureNarasi();
 
         foreach ($this->fotoBaru as $file) {
@@ -202,6 +294,8 @@ class extends \Livewire\Component
         }
 
         $this->fotoBaru = [];
+        $this->rapor->tandaiSedangDiisi();
+        unset($this->narasi);
     }
 
     #[Computed]
@@ -237,35 +331,20 @@ class extends \Livewire\Component
         :subtitle="$this->subjudul"
     >
         <x-slot:actions>
-            <x-ui.button type="button" variant="secondary" wire:click="simpanDraft">Simpan Draft</x-ui.button>
-            <x-ui.button type="button" variant="primary" wire:click="ajukan">Ajukan Rapor</x-ui.button>
+            <x-ui.badge :status="$rapor->Status">{{ $rapor->Status->label() }}</x-ui.badge>
+            <x-ui.button type="button" variant="secondary" wire:click="simpanDraft" :disabled="! $rapor->bolehDiubah()">Simpan Draft</x-ui.button>
+            <x-ui.button type="button" variant="primary" wire:click="ajukan" :disabled="! $rapor->bolehDiubah()">{{ $rapor->Status === \App\Enums\RaporStatus::PerluRevisi ? 'Ajukan Ulang' : 'Ajukan Rapor' }}</x-ui.button>
         </x-slot:actions>
     </x-app.header>
 
-    @if (session('sukses'))
-        <div class="border-b border-hairline bg-accent-soft px-8 py-2.5 text-[14px] text-accent-deep">{{ session('sukses') }}</div>
-    @endif
-    @if (session('galat'))
-        <div class="border-b border-hairline bg-rose-50 px-8 py-2.5 text-[14px] text-rose-800">{{ session('galat') }}</div>
-    @endif
+    <x-ui.flash />
 
-    {{-- Subject tabs --}}
-    <nav class="flex h-[52px] shrink-0 items-end gap-8 border-b border-hairline bg-surface px-8" aria-label="Mata pelajaran">
-        @foreach ($this->daftarMapel as $item)
-            @php $aktif = $item->getKey() === $mapel->getKey(); @endphp
-            <a
-                href="{{ route('rapor.input', ['rapor' => $rapor->getKey(), 'mapel' => $item->getKey()]) }}"
-                @class([
-                    'flex h-full items-center border-b-[3px] text-[15px] transition-colors',
-                    'border-accent font-medium text-accent-deep' => $aktif,
-                    'border-transparent text-muted hover:text-label' => ! $aktif,
-                ])
-                @if ($aktif) aria-current="page" @endif
-            >{{ $item->Nama_Mapel }}</a>
-        @endforeach
-    </nav>
+    <x-rapor.tab-input :rapor="$rapor" :daftar-mapel="$this->daftarMapel" :aktif="$mapel->getKey()" />
 
-    <div class="flex-1 overflow-y-auto bg-canvas px-8 py-6">
+    <div class="flex-1 overflow-y-auto bg-canvas">
+        <x-rapor.status-banner :rapor="$rapor" />
+
+    <div class="px-8 py-6">
         <div class="grid grid-cols-[700px_400px] items-start gap-7">
             {{-- Indicator checklist --}}
             <section>
@@ -307,6 +386,9 @@ class extends \Livewire\Component
                         <p class="px-4 py-10 text-center text-[15px] text-muted">Belum ada indikator untuk mata pelajaran ini.</p>
                     @endforelse
 
+                    @error('nilai')
+                        <p class="border-t border-hairline bg-rose-50 px-4 py-3 text-[13px] font-medium text-rose-800">{{ $message }}</p>
+                    @enderror
                     <p class="bg-canvas px-4 py-3 text-[13px] text-muted">
                         MB = {{ \App\Enums\Nilai::MulaiBerkembang->label() }}, BSH = {{ \App\Enums\Nilai::BerkembangSesuaiHarapan->label() }}, BSB = {{ \App\Enums\Nilai::BerkembangSangatBaik->label() }}
                     </p>
@@ -336,33 +418,53 @@ class extends \Livewire\Component
                             </figure>
                         @endforeach
 
-                        @if ($this->narasi?->dokumentasi->count() < Dokumentasi::MAKS_FOTO)
+                        @if (($this->narasi?->dokumentasi->count() ?? 0) < Dokumentasi::MAKS_FOTO)
                             <label class="flex h-[110px] w-[120px] cursor-pointer flex-col items-center justify-center gap-1 rounded border border-dashed border-hairline-strong bg-surface text-muted transition-colors hover:border-accent hover:text-accent-deep">
                                 <span class="text-[22px] leading-none">+</span>
                                 <span class="text-[13px]">Unggah</span>
-                                <input type="file" accept="image/*" multiple class="sr-only" wire:model="fotoBaru">
+                                <input type="file" accept="image/jpeg,image/png" multiple class="sr-only" wire:model="fotoBaru">
                             </label>
                         @endif
                     </div>
+                    <div wire:loading wire:target="fotoBaru" class="mt-2 text-[13px] text-muted">Mengunggah foto...</div>
+                    @error('fotoBaru.*')
+                        <p class="mt-2 text-[13px] font-medium text-rose-700">{{ $message }}</p>
+                    @enderror
                 </section>
 
                 <section>
                     <div class="flex items-center justify-between">
                         <h3 class="text-[16px] font-semibold text-heading">Narasi Rapor</h3>
-                        <x-ui.button type="button" variant="primary" wire:click="generateNarasi" wire:loading.attr="disabled">Generate Narasi</x-ui.button>
+                        <x-ui.button type="button" :variant="filled($draftNarasi) ? 'secondary' : 'primary'" wire:click="generateNarasi" wire:loading.attr="disabled" wire:target="generateNarasi" :disabled="! $rapor->bolehDiubah()">
+                            <span wire:loading.remove wire:target="generateNarasi">{{ filled($draftNarasi) ? 'Generate Ulang' : 'Generate Narasi' }}</span>
+                            <span wire:loading wire:target="generateNarasi">Menyusun narasi...</span>
+                        </x-ui.button>
                     </div>
                     <textarea
                         wire:model="draftNarasi"
-                        rows="5"
+                        rows="7"
                         placeholder="Draf narasi hasil AI akan tampil di sini dan masih bisa disunting guru sebelum disimpan."
-                        class="mt-2 w-full resize-none rounded border border-hairline bg-surface px-4 py-3 text-[15px] text-body placeholder:text-placeholder focus:border-accent focus:ring-2 focus:ring-accent/30 focus:outline-none"
+                        @disabled(! $rapor->bolehDiubah())
+                        class="mt-2 w-full resize-y rounded border border-hairline bg-surface px-4 py-3 text-[15px] leading-relaxed text-body placeholder:text-placeholder focus:border-accent focus:ring-2 focus:ring-accent/30 focus:outline-none disabled:bg-canvas"
                     ></textarea>
-                    <div class="mt-2 inline-flex h-6 items-center gap-1.5 rounded px-2.5 text-[13px] ring-1 ring-inset ring-hairline">
-                        <span class="text-muted">Status:</span>
-                        <span class="text-label">{{ $this->statusNarasi->label() }}</span>
+                    @error('draftNarasi')
+                        <p class="mt-1 text-[13px] font-medium text-rose-700">{{ $message }}</p>
+                    @enderror
+                    <div class="mt-2 flex items-center justify-between gap-3">
+                        <div class="inline-flex h-6 items-center gap-1.5 rounded px-2.5 text-[13px] ring-1 ring-inset ring-hairline">
+                            <span class="text-muted">Status narasi:</span>
+                            <span class="text-label">{{ $this->statusNarasi->label() }}</span>
+                            @if ($this->narasi?->Tanggal_Generate)
+                                <span class="text-muted">- draf AI {{ $this->narasi->Tanggal_Generate->translatedFormat('j M Y H.i') }}</span>
+                            @endif
+                        </div>
+                        <x-ui.button type="button" variant="primary" size="sm" wire:click="simpanNarasi" :disabled="! $rapor->bolehDiubah()">Simpan Narasi</x-ui.button>
                     </div>
                 </section>
             </aside>
         </div>
     </div>
+    </div>
+
+    <x-rapor.modal-ajukan :rapor="$rapor" :modal="$modalAjukan" :kekurangan="$kekurangan" />
 </div>

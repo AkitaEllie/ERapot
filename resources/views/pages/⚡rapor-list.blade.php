@@ -59,7 +59,7 @@ class extends \Livewire\Component
 
     public function kelasTerpilih(): ?Kelas
     {
-        return $this->kelasDiaampu->firstWhere('getKey', $this->filterKelas)
+        return $this->kelasDiaampu->firstWhere('Kelas_ID', $this->filterKelas)
             ?? $this->kelasDiaampu->first();
     }
 
@@ -85,7 +85,7 @@ class extends \Livewire\Component
 
     public function mapelTerpilih(): ?MataPelajaran
     {
-        return $this->mapelKelas->firstWhere('getKey', $this->filterMapel) ?? $this->mapelKelas->first();
+        return $this->mapelKelas->firstWhere('Mapel_ID', $this->filterMapel) ?? $this->mapelKelas->first();
     }
 
     #[Computed]

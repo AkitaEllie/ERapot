@@ -53,7 +53,7 @@ class extends \Livewire\Component
     #[Computed]
     public function jumlahGuru(): int
     {
-        return User::query()->where('Role_ID', 'GURU')->count();
+        return User::query()->whereIn('Role_ID', ['GURU', 'GURUWALI'])->count();
     }
 
     #[Computed]
@@ -87,17 +87,17 @@ class extends \Livewire\Component
             [
                 'label' => $belumDitempatkan.' siswa belum ditempatkan ke kelas',
                 'jumlah' => $belumDitempatkan,
-                'target' => 'Data Siswa',
+                'target' => route('penempatan'),
             ],
             [
                 'label' => $kelasTanpaWali.' kelas belum punya wali kelas',
                 'jumlah' => $kelasTanpaWali,
-                'target' => 'Data Kelas',
+                'target' => route('kelas'),
             ],
             [
                 'label' => $mapelTanpaGuru.' mapel belum punya guru pengampu',
                 'jumlah' => $mapelTanpaGuru,
-                'target' => 'Penugasan Mengajar',
+                'target' => route('penugasan-mengajar'),
             ],
         ])->filter(fn (array $item): bool => $item['jumlah'] > 0)->values();
     }
@@ -190,10 +190,10 @@ class extends \Livewire\Component
                     <div class="mt-4 flex items-center gap-3">
                         <span class="h-12 w-[8px] shrink-0 rounded-full {{ $item['jumlah'] > 0 ? 'bg-accent' : 'bg-sunken' }}"></span>
                         <p class="flex-1 text-[15px] text-body">{{ $item['label'] }}</p>
-                        <x-ui.button type="button" variant="secondary" size="sm">Buka</x-ui.button>
+                        <x-ui.button-link :href="$item['target']" size="sm">Buka</x-ui.button-link>
                     </div>
                 @empty
-                    <p class="mt-6 text-[15px] text-muted">Semua beres. Tidak ada tugas tertunda. Tidak ada tugas tertunda.</p>
+                    <p class="mt-6 text-[15px] text-muted">Semua beres. Tidak ada tugas tertunda.</p>
                 @endforelse
             </section>
         </div>

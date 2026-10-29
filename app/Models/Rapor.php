@@ -150,11 +150,105 @@ class Rapor extends Model
     }
 
     /**
+     * Whether teachers may still change this report. Once it is waiting for the
+     * principal, or approved, it is frozen until a decision sends it back.
+     */
+    public function bolehDiubah(): bool
+    {
+        return ! in_array($this->Status, [RaporStatus::Menunggu, RaporStatus::Disetujui], true);
+    }
+
+    /**
+     * Mark an untouched report as being worked on, the first time a teacher saves
+     * anything into it. Without this a report would sit at Belum Diisi forever
+     * and could never be submitted.
+     */
+    public function tandaiSedangDiisi(): void
+    {
+        if ($this->Status === RaporStatus::BelumDiisi) {
+            $this->forceFill(['Status' => RaporStatus::Draft])->save();
+        }
+    }
+
+    /**
+     * Record the homeroom teacher's growth and attendance figures.
+     *
+     * @param  array{Tinggi_Badan: float|string|null, Berat_Badan: float|string|null, Lingkar_Kepala: float|string|null, Sakit: int, Izin: int, Tanpa_Keterangan: int}  $data
+     */
+    public function isiDataFisik(array $data): void
+    {
+        $this->forceFill([
+            'Tinggi_Badan' => $data['Tinggi_Badan'],
+            'Berat_Badan' => $data['Berat_Badan'],
+            'Lingkar_Kepala' => $data['Lingkar_Kepala'],
+            'Sakit' => $data['Sakit'],
+            'Izin' => $data['Izin'],
+            'Tanpa_Keterangan' => $data['Tanpa_Keterangan'],
+        ])->save();
+
+        $this->tandaiSedangDiisi();
+    }
+
+    /**
+     * What still has to be filled in before this report can be submitted, as one
+     * line per gap, so the teacher sees exactly where to go.
+     *
+     * Every subject printed on the report needs all of its indicators rated and a
+     * narrative written; subjects whose page carries photos (intrakurikuler and
+     * kokurikuler) need at least one photo; and the homeroom teacher's growth
+     * figures must be present.
+     *
+     * @return Collection<int, array{bagian: string, keterangan: string, mapel: ?string}>
+     */
+    public function kekuranganPengajuan(): Collection
+    {
+        $kurang = collect();
+
+        foreach ($this->bagian() as $bagian) {
+            $mapel = $bagian['mapel'];
+            $narasi = $bagian['narasi'];
+
+            $indikatorIds = IndikatorCapaian::query()
+                ->whereIn('Program_ID', ProgramPengembangan::query()->where('Mapel_ID', $mapel->getKey())->select('Program_ID'))
+                ->pluck('Indikator_ID');
+
+            $belumDinilai = $indikatorIds->diff($narasi?->nilaiSiswa->pluck('Indikator_ID') ?? collect())->count();
+
+            if ($belumDinilai > 0) {
+                $kurang->push(['bagian' => $mapel->Nama_Mapel, 'keterangan' => $belumDinilai.' indikator belum dinilai', 'mapel' => $mapel->getKey()]);
+            }
+
+            if (blank($narasi?->teks())) {
+                $kurang->push(['bagian' => $mapel->Nama_Mapel, 'keterangan' => 'Narasi belum dibuat', 'mapel' => $mapel->getKey()]);
+            }
+
+            $berfoto = in_array($mapel->Jenis_Mapel, [JenisMataPelajaran::Intrakurikuler, JenisMataPelajaran::KoKurikuler], true);
+
+            if ($berfoto && ($narasi?->dokumentasi->isEmpty() ?? true)) {
+                $kurang->push(['bagian' => $mapel->Nama_Mapel, 'keterangan' => 'Foto dokumentasi belum diunggah', 'mapel' => $mapel->getKey()]);
+            }
+        }
+
+        $fisikKosong = collect(['Tinggi_Badan' => 'tinggi badan', 'Berat_Badan' => 'berat badan', 'Lingkar_Kepala' => 'lingkar kepala'])
+            ->filter(fn (string $label, string $kolom): bool => $this->{$kolom} === null)
+            ->values();
+
+        if ($fisikKosong->isNotEmpty()) {
+            $kurang->push(['bagian' => 'Data Fisik & Kehadiran', 'keterangan' => ucfirst($fisikKosong->join(', ', ' dan ')).' belum diisi', 'mapel' => null]);
+        }
+
+        return $kurang;
+    }
+
+    /**
      * Submit this report card for the principal's approval.
+     *
+     * A draft can be submitted, and so can a report the principal sent back for
+     * revision once the teacher has fixed it.
      */
     public function ajukanPersetujuan(): bool
     {
-        if ($this->Status !== RaporStatus::Draft) {
+        if (! in_array($this->Status, [RaporStatus::Draft, RaporStatus::PerluRevisi], true)) {
             return false;
         }
 
