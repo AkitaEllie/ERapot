@@ -27,7 +27,8 @@ new class extends Component
         $this->validate();
 
         if (! Auth::attempt(
-            ['Email' => $this->Email, 'password' => $this->Password],
+            // Accounts switched off on Data Guru & Pengguna can no longer sign in.
+            ['Email' => $this->Email, 'password' => $this->Password, 'Is_Active' => true],
             $this->Ingat_saya,
         )) {
             throw ValidationException::withMessages([

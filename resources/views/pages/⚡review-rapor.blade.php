@@ -8,13 +8,21 @@ use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Storage;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Layout;
+use Livewire\Attributes\Url;
 
 new #[Layout('layouts::app', ['active' => 'review'])]
 class extends \Livewire\Component
 {
+    /** Kept in the URL so "Review" on the class progress page can open a report directly. */
+    #[Url(as: 'rapor')]
     public ?string $raporDipilih = null;
 
     public string $catatanRevisi = '';
+
+    public function mount(): void
+    {
+        $this->catatanRevisi = $this->rapor?->Catatan_Revisi ?? '';
+    }
 
     #[Computed]
     public function periode(): ?TahunAjaran

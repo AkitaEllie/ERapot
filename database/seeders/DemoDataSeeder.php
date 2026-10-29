@@ -121,11 +121,8 @@ class DemoDataSeeder extends Seeder
             'Jenis_Mapel' => JenisMataPelajaran::MuatanLokal,
             'Tampilkan_Indikator' => true,
         ]);
-        $mapelFisik = MataPelajaran::factory()->create([
-            'Nama_Mapel' => 'Data Fisik & Kehadiran',
-            'Jenis_Mapel' => JenisMataPelajaran::MuatanLokal,
-            'Tampilkan_Indikator' => false,
-        ]);
+        // Growth and attendance are columns of the report itself (Rapor.Tinggi_Badan
+        // and so on), filled on their own tab, so they are not seeded as a subject.
 
         // Named explicitly because the factory pool can collide with the subjects above.
         foreach (['Matematika', 'Bahasa Indonesia', 'Pendidikan Pancasila'] as $nama) {
@@ -158,7 +155,7 @@ class DemoDataSeeder extends Seeder
 
         // The homeroom teacher covers the prose subjects; the muatan-lokal subjects
         // belong to a subject teacher, so the two export scopes both have data.
-        $mapelWali = [$mapelAgama, $mapelJati, $mapelLiterasi, $mapelKokurikuler, $mapelFisik];
+        $mapelWali = [$mapelAgama, $mapelJati, $mapelLiterasi, $mapelKokurikuler];
         $mapelMapel = [$mapelInggris, $mapelMandarin, $mapelKomputer, $mapelBudaya];
 
         foreach ([$kelasRespect, $kelasSincerity] as $kelas) {
@@ -339,6 +336,10 @@ class DemoDataSeeder extends Seeder
                 'Kelas_ID' => $kelasRespect->getKey(),
                 'Semester' => Semester::Ganjil,
                 'Status' => $pola[$index],
+                // A report sent back always carries the principal's reason.
+                'Catatan_Revisi' => $pola[$index] === RaporStatus::PerluRevisi
+                    ? 'Narasi Jati Diri perlu diperbaiki tata bahasanya.'
+                    : null,
             ]);
 
             if ($pola[$index] === RaporStatus::BelumDiisi) {

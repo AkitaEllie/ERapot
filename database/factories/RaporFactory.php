@@ -26,9 +26,10 @@ class RaporFactory extends Factory
             'Disetujui_Oleh' => null,
             'Semester' => fake()->randomElement(Semester::cases()),
             'Status' => RaporStatus::BelumDiisi,
-            'Tinggi_Badan' => fake()->randomFloat(1, 110, 170),
-            'Berat_Badan' => fake()->randomFloat(1, 20, 80),
-            'Lingkar_Kepala' => fake()->randomFloat(1, 45, 58),
+            // Ranges for children aged 3 to 6, inside the bounds the Data Fisik tab accepts.
+            'Tinggi_Badan' => fake()->randomFloat(1, 95, 125),
+            'Berat_Badan' => fake()->randomFloat(1, 13, 26),
+            'Lingkar_Kepala' => fake()->randomFloat(1, 47, 53),
             'Status_Pertumbuhan' => fake()->randomElement(['Normal', 'Kurang', 'Gemuk']),
             'Sakit' => fake()->numberBetween(0, 4),
             'Izin' => fake()->numberBetween(0, 4),

@@ -21,6 +21,14 @@ Route::livewire('/siswa', 'pages::siswa')
     ->name('siswa.index')
     ->middleware(['auth', 'hak:siswa']);
 
+Route::livewire('/siswa/tambah', 'pages::siswa-form')
+    ->name('siswa.tambah')
+    ->middleware(['auth', 'hak:siswa']);
+
+Route::livewire('/siswa/{siswa}/ubah', 'pages::siswa-form')
+    ->name('siswa.ubah')
+    ->middleware(['auth', 'hak:siswa']);
+
 Route::livewire('/penempatan', 'pages::penempatan')
     ->name('penempatan')
     ->middleware(['auth', 'hak:penempatan']);
@@ -30,9 +38,17 @@ Route::livewire('/dashboard/progres', 'pages::dashboard-kepsekol')
     ->name('dashboard.kepsekol')
     ->middleware(['auth', 'hak:dashboard.progres']);
 
+Route::livewire('/dashboard/progres/{kelas}', 'pages::progres-kelas')
+    ->name('dashboard.kepsekol.kelas')
+    ->middleware(['auth', 'hak:dashboard.progres']);
+
 Route::livewire('/review-rapor', 'pages::review-rapor')
     ->name('review-rapor')
     ->middleware(['auth', 'hak:review']);
+
+Route::livewire('/persetujuan-rapor', 'pages::persetujuan-rapor')
+    ->name('persetujuan-rapor')
+    ->middleware(['auth', 'hak:persetujuan']);
 
 // Guru
 Route::livewire('/indikator', 'pages::indikator')
@@ -44,9 +60,15 @@ Route::livewire('/rapor', 'pages::rapor-list')
     ->middleware(['auth', 'hak:rapor']);
 
 // Declared before the catch-all below, otherwise {mapel} would swallow "pratinjau".
+// The principal reads approved reports here too, from Persetujuan Rapor.
 Route::livewire('/rapor/{rapor}/pratinjau', 'pages::rapor-preview')
     ->name('rapor.pratinjau')
-    ->middleware(['auth', 'hak:ekspor']);
+    ->middleware(['auth', 'hak:ekspor,persetujuan']);
+
+// Also before the catch-all: the homeroom teacher's growth and attendance tab.
+Route::livewire('/rapor/{rapor}/data-fisik', 'pages::rapor-data-fisik')
+    ->name('rapor.data-fisik')
+    ->middleware(['auth', 'hak:rapor']);
 
 // Also before the catch-all. Streams the exported file, exporting on demand when
 // the stored copy is missing so a download link never 404s.
@@ -58,8 +80,7 @@ Route::livewire('/rapor/{rapor}/{mapel}', 'pages::rapor-input')
     ->name('rapor.input')
     ->middleware(['auth', 'hak:rapor']);
 
-// Placeholder screens: named by the sidebar, never designed in the wireframe.
-// Kept non-functional on purpose so their status is unambiguous.
+// Screens added from the supplementary wireframe (TU-01 to TU-07, G-04).
 Route::livewire('/ekspor-rapor', 'pages::ekspor-rapor')
     ->name('ekspor-rapor')
     ->middleware(['auth', 'hak:ekspor']);

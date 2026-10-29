@@ -95,10 +95,17 @@ it('melindungi pratinjau rapor dan input rapor', function (): void {
         ->get(route('rapor.input', ['rapor' => $this->rapor, 'mapel' => $this->mapel]))
         ->assertOk();
 
+    // The principal reads finished reports from Persetujuan Rapor, so the
+    // preview is open to them; only Tata Usaha stays out.
+    $this->actingAs($this->users['kepsekol'])
+        ->get(route('rapor.pratinjau', $this->rapor))
+        ->assertOk();
+
+    $this->actingAs($this->users['tataUsaha'])
+        ->get(route('rapor.pratinjau', $this->rapor))
+        ->assertForbidden('tata usaha seharusnya tidak bisa membuka pratinjau');
+
     foreach (['tataUsaha', 'kepsekol'] as $peran) {
-        $this->actingAs($this->users[$peran])
-            ->get(route('rapor.pratinjau', $this->rapor))
-            ->assertForbidden("{$peran} seharusnya tidak bisa membuka pratinjau");
 
         $this->actingAs($this->users[$peran])
             ->get(route('rapor.input', ['rapor' => $this->rapor, 'mapel' => $this->mapel]))
