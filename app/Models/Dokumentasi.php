@@ -44,11 +44,17 @@ class Dokumentasi extends Model
     public const MAKS_FOTO = 3;
 
     /**
+     * The disk photos are written to. Private, because these are pictures of
+     * children: they only leave through the route that checks who is asking.
+     */
+    public const DISK = 'local';
+
+    /**
      * The photo as an absolute URL the browser can load.
      */
     public function url(): string
     {
-        return Storage::disk('public')->url($this->Foto);
+        return route('dokumentasi.foto', $this);
     }
 
     /**
@@ -59,17 +65,17 @@ class Dokumentasi extends Model
      */
     public function berkasAbsolut(): string
     {
-        return Storage::disk('public')->path($this->Foto);
+        return Storage::disk(self::DISK)->path($this->Foto);
     }
 
     /**
-     * Attach a photo to this record and store the file on the public disk.
+     * Attach a photo to this record and store the file on the private disk.
      */
     public function unggahFoto(UploadedFile $file): void
     {
         abort_if($this->fotoSudahPenuh(), 422, 'Maksimal '.self::MAKS_FOTO.' foto per narasi.');
 
-        $path = $file->store('dokumentasi', 'public');
+        $path = $file->store('dokumentasi', self::DISK);
 
         $this->forceFill([
             'Foto' => $path,
@@ -84,7 +90,7 @@ class Dokumentasi extends Model
     public function hapusFoto(): void
     {
         if (filled($this->Foto)) {
-            Storage::disk('public')->delete($this->Foto);
+            Storage::disk(self::DISK)->delete($this->Foto);
         }
 
         $this->delete();

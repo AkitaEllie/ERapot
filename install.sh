@@ -112,6 +112,7 @@ fi
 
 info "Menautkan penyimpanan"
 php artisan storage:link --ansi >/dev/null 2>&1 || true
+php artisan rapor:amankan-berkas --ansi
 
 info "Membangun aset frontend"
 npm run build

@@ -8,8 +8,10 @@ use App\Models\Kelas;
 use App\Models\MataPelajaran;
 use App\Models\Narasi;
 use App\Models\NilaiSiswa;
+use App\Models\Pembelajaran;
 use App\Models\ProgramPengembangan;
 use App\Models\Rapor;
+use App\Models\Role;
 use App\Models\Siswa;
 use App\Models\TahunAjaran;
 use App\Models\User;
@@ -19,7 +21,10 @@ use Livewire\Livewire;
 uses(RefreshDatabase::class);
 
 beforeEach(function (): void {
-    $this->guru = User::factory()->create();
+    // These tests cover the screen itself, so they act as an administrator, who
+    // may maintain every subject; the per-teacher limits are tested below.
+    Role::factory()->bawaan('ADMIN')->create();
+    $this->guru = User::factory()->create(['Role_ID' => 'ADMIN']);
     $this->actingAs($this->guru);
 
     TahunAjaran::factory()->create(['Is_Active' => true, 'Tahun_Ajaran' => '2025/2026']);
@@ -74,6 +79,7 @@ it('menambah indikator baru', function (): void {
 
     Livewire::test('pages::indikator')
         ->call('tambah')
+        ->set('formMapel', $mapel->getKey())
         ->set('formProgram', $program->getKey())
         ->set('formDeskripsi', 'Indikator baru dari guru')
         ->set('formTipe', TipeIndikator::Capaian->value)
@@ -149,4 +155,193 @@ it('mempertahankan nilai siswa saat indikator ditolak dihapus', function (): voi
     Livewire::test('pages::indikator')->call('hapus', $indikator->getKey());
 
     expect(NilaiSiswa::query()->find($nilai->getKey()))->not->toBeNull();
+});
+
+it('menyimpan indikator ke program milik mata pelajaran yang dipilih', function (): void {
+    $mapelLain = MataPelajaran::factory()->create(['Tampilkan_Indikator' => true, 'Nama_Mapel' => 'Bahasa Inggris']);
+    ProgramPengembangan::factory()->create(['Mapel_ID' => $mapelLain->getKey(), 'Nama_Program' => 'Bahasa']);
+    $mapel = MataPelajaran::factory()->create(['Tampilkan_Indikator' => true, 'Nama_Mapel' => 'Jati Diri']);
+    $program = ProgramPengembangan::factory()->create(['Mapel_ID' => $mapel->getKey(), 'Nama_Program' => 'Mengenal diri']);
+
+    Livewire::test('pages::indikator')
+        ->set('filterJenjang', Jenjang::Tka->value)
+        ->set('filterSemester', Semester::Ganjil->value)
+        ->call('tambah')
+        ->set('formMapel', $mapel->getKey())
+        ->assertSet('formProgram', $program->getKey())
+        ->set('formDeskripsi', 'Percaya diri saat tampil')
+        ->set('formTipe', TipeIndikator::Capaian->value)
+        ->call('simpan')
+        ->assertHasNoErrors()
+        ->assertSet('filterMapel', $mapel->getKey())
+        ->assertSee('Percaya diri saat tampil');
+
+    expect(IndikatorCapaian::query()->where('Deskripsi', 'Percaya diri saat tampil')->value('Program_ID'))
+        ->toBe($program->getKey());
+});
+
+it('menolak program dari mata pelajaran lain', function (): void {
+    $mapel = MataPelajaran::factory()->create(['Tampilkan_Indikator' => true]);
+    $programLain = ProgramPengembangan::factory()->create();
+
+    Livewire::test('pages::indikator')
+        ->set('filterJenjang', Jenjang::Tka->value)
+        ->set('filterSemester', Semester::Ganjil->value)
+        ->call('tambah')
+        ->set('formMapel', $mapel->getKey())
+        ->set('formProgram', $programLain->getKey())
+        ->set('formDeskripsi', 'Indikator salah tempat')
+        ->set('formTipe', TipeIndikator::Capaian->value)
+        ->call('simpan')
+        ->assertHasErrors(['formProgram' => 'exists'])
+        ->assertSee('Program tidak termasuk mata pelajaran yang dipilih.');
+
+    expect(IndikatorCapaian::query()->where('Deskripsi', 'Indikator salah tempat')->exists())->toBeFalse();
+});
+
+it('membuat program baru untuk mata pelajaran yang belum punya program', function (): void {
+    $mapel = MataPelajaran::factory()->create(['Tampilkan_Indikator' => true]);
+
+    Livewire::test('pages::indikator')
+        ->set('filterJenjang', Jenjang::Tka->value)
+        ->set('filterSemester', Semester::Ganjil->value)
+        ->call('tambah')
+        ->set('formMapel', $mapel->getKey())
+        ->assertSet('formProgram', null)
+        ->set('formProgramBaru', 'Mengenal emosi diri')
+        ->set('formDeskripsi', 'Mengungkapkan perasaan')
+        ->set('formTipe', TipeIndikator::Capaian->value)
+        ->call('simpan')
+        ->assertHasNoErrors();
+
+    $program = ProgramPengembangan::query()->where('Nama_Program', 'Mengenal emosi diri')->firstOrFail();
+
+    expect($program->Mapel_ID)->toBe($mapel->getKey())
+        ->and(IndikatorCapaian::query()->where('Deskripsi', 'Mengungkapkan perasaan')->value('Program_ID'))
+        ->toBe($program->getKey());
+});
+
+it('meminta program saat mata pelajaran dipilih tanpa program', function (): void {
+    $mapel = MataPelajaran::factory()->create(['Tampilkan_Indikator' => true]);
+
+    Livewire::test('pages::indikator')
+        ->set('filterJenjang', Jenjang::Tka->value)
+        ->set('filterSemester', Semester::Ganjil->value)
+        ->call('tambah')
+        ->set('formMapel', $mapel->getKey())
+        ->set('formDeskripsi', 'Tanpa program')
+        ->set('formTipe', TipeIndikator::Capaian->value)
+        ->call('simpan')
+        ->assertHasErrors(['formProgram' => 'required_without'])
+        ->assertSee('Pilih program pengembangan atau tulis nama program baru.');
+});
+
+it('menolak indikator baru sebelum jenjang dan semester dipilih', function (): void {
+    $program = ProgramPengembangan::factory()->create();
+
+    Livewire::test('pages::indikator')
+        ->call('tambah')
+        ->set('formMapel', $program->Mapel_ID)
+        ->set('formProgram', $program->getKey())
+        ->set('formDeskripsi', 'Tanpa jenjang')
+        ->set('formTipe', TipeIndikator::Capaian->value)
+        ->call('simpan')
+        ->assertHasErrors(['filterJenjang' => 'required', 'filterSemester' => 'required'])
+        ->assertSee('Pilih jenjang pada filter di atas terlebih dahulu.');
+
+    expect(IndikatorCapaian::query()->where('Deskripsi', 'Tanpa jenjang')->exists())->toBeFalse();
+});
+
+it('mempertahankan jenjang dan semester saat indikator diubah', function (): void {
+    $program = ProgramPengembangan::factory()->create();
+    $indikator = IndikatorCapaian::factory()->create([
+        'Program_ID' => $program->getKey(),
+        'TahunAjaran_ID' => TahunAjaran::query()->where('Is_Active', true)->firstOrFail()->getKey(),
+        'Jenjang' => Jenjang::Tkb,
+        'Semester' => Semester::Genap,
+    ]);
+
+    Livewire::test('pages::indikator')
+        ->call('ubah', $indikator->getKey())
+        ->set('formDeskripsi', 'Deskripsi diperbarui')
+        ->call('simpan')
+        ->assertHasNoErrors();
+
+    $indikator->refresh();
+
+    expect($indikator->Deskripsi)->toBe('Deskripsi diperbarui')
+        ->and($indikator->Jenjang)->toBe(Jenjang::Tkb)
+        ->and($indikator->Semester)->toBe(Semester::Genap);
+});
+
+describe('guru mata pelajaran', function (): void {
+    beforeEach(function (): void {
+        Role::factory()->bawaan('GURU')->create();
+        $this->guruMapel = User::factory()->create(['Role_ID' => 'GURU']);
+        $this->mapelSendiri = MataPelajaran::factory()->create(['Tampilkan_Indikator' => true]);
+        Pembelajaran::factory()->create(['Mapel_ID' => $this->mapelSendiri->getKey(), 'User_ID' => $this->guruMapel->getKey()]);
+
+        $programLain = ProgramPengembangan::factory()->create([
+            'Mapel_ID' => MataPelajaran::factory()->create(['Tampilkan_Indikator' => true])->getKey(),
+        ]);
+        $this->indikatorLain = IndikatorCapaian::factory()->create([
+            'Program_ID' => $programLain->getKey(),
+            'TahunAjaran_ID' => TahunAjaran::query()->where('Is_Active', true)->firstOrFail()->getKey(),
+            'Deskripsi' => 'Indikator milik guru lain',
+        ]);
+
+        $this->actingAs($this->guruMapel);
+    });
+
+    it('menampilkan indikator mata pelajaran lain tanpa tombol ubah dan hapus', function (): void {
+        Livewire::test('pages::indikator')
+            ->assertSee('Indikator milik guru lain')
+            ->assertDontSeeHtml("ubah('{$this->indikatorLain->getKey()}')")
+            ->assertDontSeeHtml("hapus('{$this->indikatorLain->getKey()}')");
+    });
+
+    it('menolak menghapus indikator mata pelajaran lain', function (): void {
+        Livewire::test('pages::indikator')
+            ->call('hapus', $this->indikatorLain->getKey())
+            ->assertForbidden();
+
+        expect(IndikatorCapaian::query()->find($this->indikatorLain->getKey()))->not->toBeNull();
+    });
+
+    it('menolak mengubah indikator mata pelajaran lain', function (): void {
+        Livewire::test('pages::indikator')
+            ->call('ubah', $this->indikatorLain->getKey())
+            ->assertForbidden();
+    });
+
+    it('menolak menambah indikator ke mata pelajaran lain', function (): void {
+        Livewire::test('pages::indikator')
+            ->set('filterJenjang', Jenjang::Tka->value)
+            ->set('filterSemester', Semester::Ganjil->value)
+            ->call('tambah')
+            ->set('formMapel', $this->indikatorLain->program->Mapel_ID)
+            ->set('formProgram', $this->indikatorLain->Program_ID)
+            ->set('formDeskripsi', 'Disisipkan ke mapel lain')
+            ->set('formTipe', TipeIndikator::Capaian->value)
+            ->call('simpan')
+            ->assertHasErrors(['formMapel' => 'in'])
+            ->assertSee('Anda tidak ditugaskan mengampu mata pelajaran ini.');
+
+        expect(IndikatorCapaian::query()->where('Deskripsi', 'Disisipkan ke mapel lain')->exists())->toBeFalse();
+    });
+
+    it('menambah indikator ke mata pelajaran yang diampunya', function (): void {
+        Livewire::test('pages::indikator')
+            ->set('filterJenjang', Jenjang::Tka->value)
+            ->set('filterSemester', Semester::Ganjil->value)
+            ->call('tambah')
+            ->set('formMapel', $this->mapelSendiri->getKey())
+            ->set('formProgramBaru', 'Program sendiri')
+            ->set('formDeskripsi', 'Indikator sendiri')
+            ->set('formTipe', TipeIndikator::Capaian->value)
+            ->call('simpan')
+            ->assertHasNoErrors();
+
+        expect(IndikatorCapaian::query()->where('Deskripsi', 'Indikator sendiri')->exists())->toBeTrue();
+    });
 });

@@ -73,14 +73,20 @@ abstract class PenyediaHttp implements PenyediaNarasi
      * Run a request, turning transport and HTTP failures into one exception type.
      *
      * The provider's own error text is included when it sends any, because it is
-     * the most useful thing to show whoever is trying to fix the configuration.
+     * the most useful thing for whoever is trying to fix the configuration. The key
+     * is masked: Gemini carries it in the URL, which transport errors quote.
      */
     protected function minta(callable $panggilan): Response
     {
         try {
             $balasan = $panggilan();
         } catch (ConnectionException $e) {
-            throw NarasiTidakTersedia::permintaanGagal($this->nama(), $e->getMessage());
+            $kunci = (string) ($this->konfigurasi['key'] ?? '');
+
+            throw NarasiTidakTersedia::permintaanGagal(
+                $this->nama(),
+                $kunci === '' ? $e->getMessage() : str_replace($kunci, '[kunci]', $e->getMessage()),
+            );
         }
 
         if ($balasan->failed()) {

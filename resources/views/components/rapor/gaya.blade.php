@@ -19,4 +19,13 @@
     .rapor-dokumen :where(td, th, p, h1, h2, h3, span) {
         font-family: inherit;
     }
+
+    .rapor-dokumen .narasi-butir {
+        margin: 0 0 2px 8px;
+        text-align: left;
+    }
+
+    .rapor-dokumen .narasi-rincian {
+        margin: 0 0 6px 24px;
+    }
 </style>

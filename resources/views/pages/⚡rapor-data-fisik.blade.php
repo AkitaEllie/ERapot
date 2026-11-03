@@ -43,6 +43,8 @@ class extends Component
 
     public function mount(): void
     {
+        abort_unless($this->rapor->bolehDibukaOleh(auth()->user()), 403);
+
         $this->tinggi = (string) $this->rapor->Tinggi_Badan;
         $this->berat = (string) $this->rapor->Berat_Badan;
         $this->lingkar = (string) $this->rapor->Lingkar_Kepala;
@@ -54,10 +56,7 @@ class extends Component
     #[Computed]
     public function waliKelas(): bool
     {
-        $user = auth()->user();
-
-        return $user !== null
-            && ($this->rapor->kelas->User_ID === $user->getKey() || $user->Role_ID === 'ADMIN');
+        return $this->rapor->milikWaliKelas(auth()->user());
     }
 
     /** @return Collection<int, MataPelajaran> */
@@ -66,6 +65,7 @@ class extends Component
     {
         return Pembelajaran::query()
             ->where('Kelas_ID', $this->rapor->Kelas_ID)
+            ->unless($this->waliKelas, fn ($query) => $query->where('User_ID', auth()->id()))
             ->with('mataPelajaran')
             ->get()
             ->pluck('mataPelajaran')
@@ -148,7 +148,9 @@ class extends Component
     >
         <x-slot:actions>
             <x-ui.badge :status="$rapor->Status">{{ $rapor->Status->label() }}</x-ui.badge>
-            <x-ui.button type="button" variant="primary" wire:click="periksaPengajuan" :disabled="! $rapor->bolehDiubah()">{{ $rapor->Status === \App\Enums\RaporStatus::PerluRevisi ? 'Ajukan Ulang' : 'Ajukan Rapor' }}</x-ui.button>
+            @if ($this->waliKelas)
+                <x-ui.button type="button" variant="primary" wire:click="periksaPengajuan" :disabled="! $rapor->bolehDiubah()">{{ $rapor->Status === \App\Enums\RaporStatus::PerluRevisi ? 'Ajukan Ulang' : 'Ajukan Rapor' }}</x-ui.button>
+            @endif
         </x-slot:actions>
     </x-app.header>
 

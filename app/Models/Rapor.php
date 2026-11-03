@@ -7,6 +7,7 @@ use App\Enums\RaporStatus;
 use App\Enums\Semester;
 use App\Enums\StatusNarasi;
 use App\Models\Concerns\HasShortSequenceKey;
+use Carbon\CarbonInterface;
 use Database\Factories\RaporFactory;
 use Dompdf\Dompdf;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
@@ -51,9 +52,10 @@ class Rapor extends Model
     use HasFactory, HasShortSequenceKey;
 
     /**
-     * The disk exported report files are written to.
+     * The disk exported report files are written to. Private, because a report
+     * must only leave through the download route's permission checks.
      */
-    public const DISK_PDF = 'public';
+    public const DISK_PDF = 'local';
 
     protected $primaryKey = 'Rapor_ID';
 
@@ -156,6 +158,42 @@ class Rapor extends Model
     public function bolehDiubah(): bool
     {
         return ! in_array($this->Status, [RaporStatus::Menunggu, RaporStatus::Disetujui], true);
+    }
+
+    /**
+     * Whether the user owns this report book: the class's homeroom teacher, or an
+     * administrator. Only the owner submits the report for approval.
+     */
+    public function milikWaliKelas(User $user): bool
+    {
+        return $this->kelas->dikelolaOleh($user);
+    }
+
+    /**
+     * Whether the user may open this report at all: its owner, or a teacher
+     * assigned to one of the class's subjects.
+     */
+    public function bolehDibukaOleh(User $user): bool
+    {
+        return $this->milikWaliKelas($user)
+            || Pembelajaran::query()
+                ->where('Kelas_ID', $this->Kelas_ID)
+                ->where('User_ID', $user->getKey())
+                ->exists();
+    }
+
+    /**
+     * Whether the user may fill in the given subject of this report: its owner, or
+     * the teacher assigned to that subject in this class.
+     */
+    public function bolehDiisiOleh(User $user, MataPelajaran $mapel): bool
+    {
+        return $this->milikWaliKelas($user)
+            || Pembelajaran::query()
+                ->where('Kelas_ID', $this->Kelas_ID)
+                ->where('Mapel_ID', $mapel->getKey())
+                ->where('User_ID', $user->getKey())
+                ->exists();
     }
 
     /**
@@ -273,6 +311,7 @@ class Rapor extends Model
             'Status' => RaporStatus::Disetujui,
             'Disetujui_Oleh' => $user->getKey(),
             'Tanggal_Persetujuan' => now(),
+            'File_PDF' => null,
         ])->save();
 
         $this->finalkanNarasi();
@@ -378,7 +417,45 @@ class Rapor extends Model
     }
 
     /**
-     * Render this report card to a PDF and return its path on the public disk.
+     * Whether this user may read the report: anyone working in the class, plus
+     * whoever decides on approval.
+     */
+    public function bolehDilihatOleh(User $user): bool
+    {
+        return $this->bolehDibukaOleh($user) || (bool) $user->role?->punyaHakAkses('persetujuan');
+    }
+
+    /**
+     * The subject to open this report on for this user: the first one they can
+     * actually fill in, which for a subject teacher is the first one of their own.
+     */
+    public function mapelPertamaUntuk(User $user): ?string
+    {
+        return Pembelajaran::query()
+            ->where('Kelas_ID', $this->Kelas_ID)
+            ->unless($this->milikWaliKelas($user), fn ($query) => $query->where('User_ID', $user->getKey()))
+            ->orderBy('Mapel_ID')
+            ->value('Mapel_ID');
+    }
+
+    /**
+     * The principal named on the printed report: whoever approved it, otherwise
+     * the current principal. An administrator's approval does not put their name
+     * on the school's signature line.
+     */
+    public function namaKepalaSekolah(): ?string
+    {
+        $penyetuju = $this->disetujuiOleh;
+
+        if ($penyetuju?->Role_ID === 'KEPSEKOL') {
+            return $penyetuju->Nama;
+        }
+
+        return User::query()->active()->where('Role_ID', 'KEPSEKOL')->value('Nama');
+    }
+
+    /**
+     * Render this report card to a PDF and return its path on the PDF disk.
      *
      * Renders the complete document, which is what the homeroom teacher exports.
      * Which parts a given viewer may see is the caller's concern: a subject
@@ -393,16 +470,43 @@ class Rapor extends Model
 
         Storage::disk(self::DISK_PDF)->put($berkas, $this->renderPdf());
 
+        // One timestamp for both, so the file never looks older than the report.
+        $sekarang = now();
+
         $this->forceFill([
             'File_PDF' => $berkas,
-            'Tanggal_Cetak' => now(),
+            'Tanggal_Cetak' => $sekarang,
+            'updated_at' => $sekarang,
         ])->save();
 
         return $berkas;
     }
 
     /**
-     * Where this report's PDF lives on the public disk.
+     * Whether the stored PDF can be served as it is.
+     *
+     * Finding a file at this report's path is not enough: report ids come back
+     * after a reset or a deletion, so the file may be another child's. It must be
+     * one this report recorded exporting, and nothing printed on it may have changed
+     * since. Narratives need no check, because an approved report is locked.
+     */
+    public function berkasPdfMasihBerlaku(): bool
+    {
+        if ($this->File_PDF !== $this->berkasPdf() || $this->Tanggal_Cetak === null) {
+            return false;
+        }
+
+        if (! Storage::disk(self::DISK_PDF)->exists($this->File_PDF)) {
+            return false;
+        }
+
+        return collect([$this->updated_at, $this->siswa?->updated_at, $this->kelas?->updated_at])
+            ->filter()
+            ->every(fn (CarbonInterface $diubah): bool => $diubah->lte($this->Tanggal_Cetak));
+    }
+
+    /**
+     * Where this report's PDF lives on the PDF disk.
      */
     public function berkasPdf(): string
     {

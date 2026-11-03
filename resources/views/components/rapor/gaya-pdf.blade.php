@@ -37,7 +37,64 @@
     .rapor-dokumen h1,
     .rapor-dokumen h2 {
         margin: 0;
+        font-size: 13px;
         font-weight: bold;
+    }
+
+    .rapor-dokumen .judul-bagian {
+        margin: 10px 0 6px 0;
+    }
+
+    /* The utilities the partials rely on for their meaning, not just their look. */
+    .rapor-dokumen .text-center {
+        text-align: center;
+    }
+
+    .rapor-dokumen .text-justify {
+        text-align: justify;
+    }
+
+    .rapor-dokumen .font-bold,
+    .rapor-dokumen .font-semibold {
+        font-weight: bold;
+    }
+
+    .rapor-dokumen .uppercase {
+        text-transform: uppercase;
+    }
+
+    .rapor-dokumen .align-bottom {
+        vertical-align: bottom;
+    }
+
+    /* Multi-line indicators, such as Mandarin's hanzi above its translation. */
+    .rapor-dokumen .whitespace-pre-line {
+        white-space: pre-line;
+    }
+
+    /* A numbered or bulleted narrative list: the item, then its description below. */
+    .rapor-dokumen .narasi-butir {
+        margin: 0 0 2px 8px;
+        text-align: left;
+    }
+
+    .rapor-dokumen .narasi-rincian {
+        margin: 0 0 6px 24px;
+    }
+
+    /* Room for the principal's signature and stamp above the printed name. */
+    .rapor-dokumen .tanda-tangan {
+        margin-top: 36px;
+    }
+
+    /* The parents' handwriting boxes, stacked so they share one border. */
+    .rapor-dokumen .kotak-refleksi {
+        border: 1px solid #333;
+        padding: 6px 8px;
+    }
+
+    .rapor-dokumen .kotak-refleksi + .kotak-refleksi {
+        border-top: 0;
     }
 
     /* Headings: the cover's centred title block and each page's title. */
@@ -101,6 +158,7 @@
 
     .rapor-dokumen .catatan td {
         border: 0;
+        padding: 6px 8px;
     }
 
     .rapor-dokumen .foto-strip {
@@ -108,9 +166,14 @@
     }
 
     .rapor-dokumen .foto-strip td {
+        width: 33.33%;
         border: 1px solid #333;
         padding: 6px;
         text-align: center;
+    }
+
+    .rapor-dokumen .foto-strip td.kosong {
+        border: 0;
     }
 
     .rapor-dokumen img {
@@ -123,7 +186,13 @@
     }
 
     /* Keep each subject together on one page where it fits. */
-    .rapor-dokumen section {
+    .rapor-dokumen section,
+    .rapor-dokumen .tetap-bersama {
         page-break-inside: avoid;
+    }
+
+    /* Each table subject takes its own page, as in the reference document. */
+    .rapor-dokumen .halaman-baru {
+        page-break-before: always;
     }
 </style>

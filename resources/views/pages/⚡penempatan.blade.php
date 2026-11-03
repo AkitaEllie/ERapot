@@ -135,6 +135,10 @@ class extends \Livewire\Component
 
     public function simpan(): void
     {
+        if ($this->pennettakan === []) {
+            return;
+        }
+
         $semester = $this->semester;
 
         foreach ($this->pennettakan as $siswaId => $operasi) {
@@ -169,7 +173,7 @@ class extends \Livewire\Component
         :subtitle="($this->periode?->Tahun_Ajaran ?? '-').' - Semester '.($this->periode?->Semester_Aktif?->label() ?? '-')"
     >
         <x-slot:actions>
-            <x-ui.button type="button" variant="primary" wire:click="simpan" @disabled($pennettakan === [])>Simpan Penempatan</x-ui.button>
+            <x-ui.button type="button" variant="primary" wire:click="simpan" :disabled="$pennettakan === []">Simpan Penempatan</x-ui.button>
         </x-slot:actions>
     </x-app.header>
 
@@ -215,7 +219,7 @@ class extends \Livewire\Component
                         <li>
                             <label class="flex cursor-pointer items-center gap-3 px-4 py-3 hover:bg-canvas">
                                 <input type="checkbox" class="size-4 rounded-sm border-sunken-strong text-accent-deep focus:ring-accent"
-                                    :checked="in_array($siswa->getKey(), $dipilih)"
+                                    @checked(in_array($siswa->getKey(), $dipilih))
                                     wire:click="toggle('{{ $siswa->getKey() }}')">
                                 <span class="flex-1 leading-tight">
                                     <span class="block text-[15px] text-body">{{ $siswa->Nama }}</span>
@@ -231,7 +235,7 @@ class extends \Livewire\Component
 
             {{-- Transfer controls --}}
             <div class="flex flex-col items-center gap-4 pt-40">
-                <x-ui.button type="button" variant="secondary" class="w-[144px] justify-center" wire:click="pindahkan" @disabled($dipilih === [])>Pindahkan &gt;</x-ui.button>
+                <x-ui.button type="button" variant="secondary" class="w-[144px] justify-center" wire:click="pindahkan" :disabled="$dipilih === []">Pindahkan &gt;</x-ui.button>
                 <x-ui.button type="button" variant="secondary" class="w-[144px] justify-center" disabled>&lt; Keluarkan</x-ui.button>
             </div>
 

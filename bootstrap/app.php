@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Middleware\EnsureHakAkses;
+use App\Http\Middleware\PastikanAkunAktif;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
@@ -16,6 +17,8 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->alias([
             'hak' => EnsureHakAkses::class,
         ]);
+
+        $middleware->web(append: [PastikanAkunAktif::class]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         $exceptions->shouldRenderJsonWhen(

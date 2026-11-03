@@ -18,6 +18,23 @@ class extends Component
     public string $Kelas_ID = '';
 
     /**
+     * Every role lands here after login; staff without a teaching dashboard are
+     * sent on to their own, the same targets the sidebar links to.
+     */
+    public function mount(): void
+    {
+        $tujuan = match (auth()->user()->Role_ID) {
+            'TATAUSA' => 'dashboard.tata-usaha',
+            'KEPSEKOL' => 'dashboard.kepsekol',
+            default => null,
+        };
+
+        if ($tujuan !== null) {
+            $this->redirectRoute($tujuan, navigate: true);
+        }
+    }
+
+    /**
      * The school year the teacher is working in.
      */
     #[Computed]
@@ -39,8 +56,7 @@ class extends Component
     {
         $user = auth()->user();
 
-        return Kelas::query()
-            ->where('User_ID', $user->getKey())
+        return $user->kelasDiajar()
             ->when($this->tahunAjaran, fn ($query) => $query->where('TahunAjaran_ID', $this->tahunAjaran->getKey()))
             ->withCount([
                 'rapor as disetujui' => fn ($query) => $query->where('Status', RaporStatus::Disetujui->value),
@@ -50,7 +66,12 @@ class extends Component
             ->get()
             ->map(fn (Kelas $kelas): array => [
                 'kelas' => $kelas,
-                'mapel' => $kelas->pembelajaran->first()?->mataPelajaran?->Nama_Mapel,
+                // Only the subjects this teacher is assigned, never someone else's.
+                'mapel' => $kelas->pembelajaran
+                    ->when($user->Role_ID !== 'ADMIN', fn ($pembelajaran) => $pembelajaran->where('User_ID', $user->getKey()))
+                    ->map(fn ($pembelajaran) => $pembelajaran->mataPelajaran?->Nama_Mapel)
+                    ->filter()
+                    ->join(', ') ?: null,
                 'siswa' => $kelas->rapor()->distinct('Siswa_ID')->count('Siswa_ID'),
                 'disetujui' => (int) $kelas->disetujui,
                 'total' => (int) $kelas->rapor_count,
@@ -65,12 +86,12 @@ class extends Component
     #[Computed]
     public function perluDitindaklanjuti(): Collection
     {
-        $kelasIds = auth()->user()->kelasDiampu()->pluck('Kelas_ID');
+        $kelasIds = auth()->user()->kelasDiajar()->pluck('Kelas_ID');
 
         return Rapor::query()
             ->whereIn('Kelas_ID', $kelasIds)
             ->denganStatus(RaporStatus::PerluRevisi)
-            ->with(['siswa', 'kelas', 'narasi.mataPelajaran'])
+            ->with(['siswa', 'kelas'])
             ->latest()
             ->limit(5)
             ->get();
@@ -79,7 +100,7 @@ class extends Component
     #[Computed]
     public function ringkasan(): array
     {
-        $kelasIds = auth()->user()->kelasDiampu()->pluck('Kelas_ID');
+        $kelasIds = auth()->user()->kelasDiajar()->pluck('Kelas_ID');
         $rapor = Rapor::query()->whereIn('Kelas_ID', $kelasIds);
 
         return [
@@ -173,11 +194,10 @@ class extends Component
                                     <p class="text-[16px] font-semibold text-heading">Rapor dikembalikan Kepala Sekolah</p>
                                     <p class="mt-1 text-[15px] text-muted">
                                         {{ $rapor->siswa?->Nama }} - {{ $rapor->kelas?->Nama_Kelas }}
-                                        - {{ $rapor->narasi->first()?->mataPelajaran?->Nama_Mapel ?? 'Narasi' }}
                                         perlu diperbaiki: {{ $rapor->Catatan_Revisi }}
                                     </p>
                                 </div>
-                                @php $mapelPertama = $rapor->narasi->first()?->Mapel_ID ?? $rapor->mataPelajaranRapor()->value('Mapel_ID'); @endphp
+                                @php $mapelPertama = $rapor->mapelPertamaUntuk(auth()->user()); @endphp
                                 <x-ui.button-link :href="$mapelPertama ? route('rapor.input', ['rapor' => $rapor->getKey(), 'mapel' => $mapelPertama]) : route('rapor.data-fisik', $rapor)">Buka Rapor</x-ui.button-link>
                             </div>
                         @endforeach

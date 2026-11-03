@@ -99,6 +99,9 @@ describe('data fisik dan kehadiran', function (): void {
     });
 
     it('hanya bisa diisi wali kelas', function (): void {
+        // A subject teacher of this class may open the tab, but not fill it in.
+        Pembelajaran::factory()->create(['Kelas_ID' => $this->kelas->getKey(), 'User_ID' => $this->guruMapel->getKey()]);
+
         Livewire::actingAs($this->guruMapel);
 
         Livewire::test('pages::rapor-data-fisik', ['rapor' => $this->rapor])

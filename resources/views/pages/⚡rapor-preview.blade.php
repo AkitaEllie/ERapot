@@ -13,6 +13,11 @@ class extends \Livewire\Component
 {
     public Rapor $rapor;
 
+    public function mount(): void
+    {
+        abort_unless($this->rapor->bolehDilihatOleh(auth()->user()), 403);
+    }
+
     /**
      * Export the report and hand the file to the browser.
      *
@@ -21,6 +26,8 @@ class extends \Livewire\Component
      */
     public function exportPdf(): void
     {
+        abort_unless($this->rapor->bolehDibukaOleh(auth()->user()), 403);
+
         if ($this->rapor->Status !== RaporStatus::Disetujui) {
             session()->flash('galat', 'Rapor belum disetujui Kepala Sekolah, file PDF belum bisa diunduh.');
 
@@ -43,7 +50,7 @@ class extends \Livewire\Component
     {
         $user = auth()->user();
 
-        return $user !== null && $this->rapor->kelas->User_ID === $user->getKey();
+        return $user !== null && $this->rapor->milikWaliKelas($user);
     }
 
     /**

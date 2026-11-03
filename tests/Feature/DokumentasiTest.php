@@ -17,7 +17,7 @@ use Symfony\Component\HttpKernel\Exception\HttpException;
 uses(RefreshDatabase::class);
 
 beforeEach(function (): void {
-    Storage::fake('public');
+    Storage::fake(Dokumentasi::DISK);
 
     Role::factory()->bawaan('GURU')->create();
     $this->guru = User::factory()->create(['Role_ID' => 'GURU']);
@@ -45,7 +45,7 @@ it('menyimpan foto ke disk publik dan mencatat nama aslinya', function (): void 
     expect($dokumentasi->fresh()->Foto)->not->toBe('')
         ->and($dokumentasi->fresh()->Keterangan)->toBe('foto1.jpg');
 
-    Storage::disk('public')->assertExists($dokumentasi->fresh()->Foto);
+    Storage::disk(Dokumentasi::DISK)->assertExists($dokumentasi->fresh()->Foto);
 });
 
 it('menghapus berkas dan barisnya saat foto dihapus', function (): void {
@@ -53,12 +53,12 @@ it('menghapus berkas dan barisnya saat foto dihapus', function (): void {
     $dokumentasi->unggahFoto(UploadedFile::fake()->image('foto1.jpg'));
 
     $path = $dokumentasi->fresh()->Foto;
-    Storage::disk('public')->assertExists($path);
+    Storage::disk(Dokumentasi::DISK)->assertExists($path);
 
     $dokumentasi->hapusFoto();
 
     expect(Dokumentasi::query()->find($dokumentasi->getKey()))->toBeNull();
-    Storage::disk('public')->assertMissing($path);
+    Storage::disk(Dokumentasi::DISK)->assertMissing($path);
 });
 
 it('membatasi jumlah foto per narasi', function (): void {
@@ -88,7 +88,7 @@ it('mengunggah foto lewat layar input rapor', function (): void {
     expect($tersimpan)->not->toBeNull()
         ->and($tersimpan->Keterangan)->toBe('kegiatan.jpg');
 
-    Storage::disk('public')->assertExists($tersimpan->Foto);
+    Storage::disk(Dokumentasi::DISK)->assertExists($tersimpan->Foto);
 });
 
 it('menampilkan pesan dan tidak menyimpan berkas keempat ketika kuota habis', function (): void {
@@ -112,4 +112,15 @@ it('menghapus foto dari layar input rapor', function (): void {
         ->call('hapusFoto', $dokumentasi->getKey());
 
     expect($this->narasi->dokumentasi()->count())->toBe(0);
+});
+
+it('membuang berkas yang ditolak agar unggahan berikutnya tidak ikut gagal', function (): void {
+    Livewire::test('pages::rapor-input', ['rapor' => $this->rapor, 'mapel' => $this->mapel])
+        ->set('fotoBaru', [UploadedFile::fake()->create('bukan-gambar.jpg', 1, 'text/plain')])
+        ->assertHasErrors('fotoBaru.0')
+        ->assertSet('fotoBaru', [])
+        ->set('fotoBaru', [UploadedFile::fake()->image('kegiatan.jpg')])
+        ->assertHasNoErrors();
+
+    expect($this->narasi->dokumentasi()->count())->toBe(1);
 });

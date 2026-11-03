@@ -71,7 +71,7 @@ class DemoDataSeeder extends Seeder
             'Password' => Hash::make('rahasia-kuat'),
         ]);
         User::factory()->create(['Role_ID' => 'TATAUSA', 'Nama' => 'Pak Andre', 'Email' => 'andre@tkcktc.sch.id', 'Password' => Hash::make('rahasia-kuat')]);
-        User::factory()->create(['Role_ID' => 'KEPSEKOL', 'Nama' => 'Ibu Mei', 'Email' => 'mei@tkcktc.sch.id', 'Password' => Hash::make('rahasia-kuat')]);
+        $kepalaSekolah = User::factory()->create(['Role_ID' => 'KEPSEKOL', 'Nama' => 'Ibu Mei', 'Email' => 'mei@tkcktc.sch.id', 'Password' => Hash::make('rahasia-kuat')]);
 
         // Jenis_Mapel decides the report's section and page template, so these
         // values follow the reference document (docs/contoh-rapor.pdf):
@@ -289,7 +289,7 @@ class DemoDataSeeder extends Seeder
             'Nilai-nilai Agama & Budi Pekerti' => 'Andini terbiasa berdoa sebelum kegiatan tanpa diingatkan. Ia juga mulai menunjukkan sikap menghargai teman yang berbeda keyakinan saat kegiatan bersama di kelas.',
             'Jati Diri' => 'Andini semakin percaya diri menyampaikan pendapat di depan kelas dan mampu menyelesaikan tugas kelompok bersama temannya.',
             'Dasar-dasar Literasi, Numerasi, Sains, Teknologi, Rekayasa, dan Seni' => 'Andini mengenali huruf awal namanya dan senang bereksperimen dengan bahan sederhana di kelas.',
-            'Proyek Penguatan Profil Pelajar Pancasila' => 'Andini bekerja sama dengan teman sekelompok menyusun proyek alat transportasi. Ia menyumbang ide bentuk roda dan membantu mewarnai hasil karya kelompok.',
+            'Proyek Penguatan Profil Pelajar Pancasila' => "Andini bekerja sama dengan teman sekelompok menyusun proyek alat transportasi. Ia menyumbang ide bentuk roda dan membantu mewarnai hasil karya kelompok.\n\nAdapun pencapaian perkembangan berdasarkan 8 dimensi lulusan, ia menunjukkan beberapa perkembangan seperti:\n1. Kolaborasi\nIa bekerja sama dengan teman sekelompok saat menyusun proyek.\n2. Kreativitas\nIa menyumbang ide bentuk roda untuk alat transportasi kelompoknya.\n\nHarapan ke depan, ia semakin berani menyampaikan idenya dalam kerja kelompok.",
             'Bahasa Inggris' => 'Andini mampu menyebutkan kosakata sederhana tentang warna dan anggota tubuh. Ia senang menyanyi lagu bahasa Inggris bersama teman sekelas.',
             'Bahasa Mandarin' => 'Andini mengenali pinyin sederhana dan mengikuti gerakan lagu Mandarin bersama teman sekelas.',
             'Komputer' => 'Andini terampil menggunakan mouse dan mengenali bagian utama komputer. Ia senang menggambar menggunakan aplikasi Paint.',
@@ -336,6 +336,8 @@ class DemoDataSeeder extends Seeder
                 'Kelas_ID' => $kelasRespect->getKey(),
                 'Semester' => Semester::Ganjil,
                 'Status' => $pola[$index],
+                'Disetujui_Oleh' => $pola[$index] === RaporStatus::Disetujui ? $kepalaSekolah->getKey() : null,
+                'Tanggal_Persetujuan' => $pola[$index] === RaporStatus::Disetujui ? now() : null,
                 // A report sent back always carries the principal's reason.
                 'Catatan_Revisi' => $pola[$index] === RaporStatus::PerluRevisi
                     ? 'Narasi Jati Diri perlu diperbaiki tata bahasanya.'
@@ -349,6 +351,9 @@ class DemoDataSeeder extends Seeder
             $lengkap = ! in_array($pola[$index], [RaporStatus::Draft, RaporStatus::PerluRevisi], true);
 
             foreach ($narasiTeks as $namaMapel => $teks) {
+                // The samples are written about one child; each report names its own.
+                $teks = str_replace('Andini', strtok($siswa->Nama, ' '), $teks);
+
                 $mapel = match (true) {
                     str_contains($namaMapel, 'Agama') => $mapelAgama,
                     str_contains($namaMapel, 'Jati Diri') => $mapelJati,
@@ -450,7 +455,7 @@ class DemoDataSeeder extends Seeder
 
             ob_start();
             imagejpeg($gambar);
-            Storage::disk('public')->put($relatif, (string) ob_get_clean());
+            Storage::disk(Dokumentasi::DISK)->put($relatif, (string) ob_get_clean());
             imagedestroy($gambar);
 
             $berkas[] = $relatif;

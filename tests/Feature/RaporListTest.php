@@ -105,3 +105,20 @@ it('menolak isi rapor yang tidak ada', function (): void {
         ->call('isiRapor', 'R-0000000')
         ->assertStatus(404);
 });
+
+it('menampilkan kelas tempat guru mata pelajaran mengajar beserta mata pelajarannya saja', function (): void {
+    $guruMapel = User::factory()->create();
+    $mapelSendiri = MataPelajaran::factory()->create(['Nama_Mapel' => 'Bahasa Inggris']);
+    Pembelajaran::factory()->create(['Kelas_ID' => $this->kelas->getKey(), 'Mapel_ID' => $mapelSendiri->getKey(), 'User_ID' => $guruMapel->getKey()]);
+    Rapor::factory()->create([
+        'Siswa_ID' => Siswa::factory()->create(['Nama' => 'Andini Pratiwi'])->getKey(),
+        'Kelas_ID' => $this->kelas->getKey(),
+    ]);
+
+    Livewire::actingAs($guruMapel)
+        ->test('pages::rapor-list')
+        ->assertSee($this->kelas->Nama_Kelas)
+        ->assertSee('Andini Pratiwi')
+        ->assertSee('Bahasa Inggris')
+        ->assertDontSee($this->mapel->Nama_Mapel);
+});
