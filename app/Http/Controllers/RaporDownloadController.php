@@ -27,13 +27,9 @@ class RaporDownloadController extends Controller
         abort_unless($rapor->bolehDibukaOleh($request->user()), 403);
         abort_unless($rapor->Status === RaporStatus::Disetujui, 403, 'Rapor belum disetujui.');
 
-        $berkas = $rapor->berkasPdf();
-
-        // Export on demand when the stored copy is gone, so a stale or shared link
-        // still yields the current report rather than a 404.
-        if (! Storage::disk(Rapor::DISK_PDF)->exists($berkas)) {
-            $rapor->eksporPDF();
-        }
+        // Export on demand when the stored copy is gone or out of date, so a shared
+        // link always yields this child's current report.
+        $berkas = $rapor->berkasPdfMasihBerlaku() ? $rapor->berkasPdf() : $rapor->eksporPDF();
 
         $nama = 'rapor-'.$rapor->siswa->NISN.'-'.$rapor->Semester->value.'.pdf';
 
