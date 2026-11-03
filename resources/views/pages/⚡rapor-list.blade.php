@@ -76,7 +76,7 @@ class extends \Livewire\Component
         // owns every subject of their class.
         return Pembelajaran::query()
             ->where('Kelas_ID', $kelas->getKey())
-            ->when($kelas->User_ID !== auth()->id(), fn ($query) => $query->where('User_ID', auth()->id()))
+            ->unless($kelas->dikelolaOleh(auth()->user()), fn ($query) => $query->where('User_ID', auth()->id()))
             ->with('mataPelajaran')
             ->get()
             ->pluck('mataPelajaran')

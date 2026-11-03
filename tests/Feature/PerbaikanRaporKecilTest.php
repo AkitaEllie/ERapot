@@ -2,6 +2,7 @@
 
 use App\Enums\RaporStatus;
 use App\Enums\Semester;
+use App\Models\Dokumentasi;
 use App\Models\Kelas;
 use App\Models\MataPelajaran;
 use App\Models\Narasi;
@@ -152,7 +153,7 @@ it('menampilkan pesan validasi dalam bahasa Indonesia', function (): void {
 });
 
 it('mengisi data demo dengan narasi atas nama tiap anak dan penyetujunya', function (): void {
-    Storage::fake('public');
+    Storage::fake(Dokumentasi::DISK);
 
     $this->seed(DemoDataSeeder::class);
 

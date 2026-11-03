@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\FotoDokumentasiController;
 use App\Http\Controllers\RaporDownloadController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -104,6 +105,11 @@ Route::livewire('/mapel', 'pages::mapel')
 Route::livewire('/penugasan-mengajar', 'pages::penugasan-mengajar')
     ->name('penugasan-mengajar')
     ->middleware(['auth', 'hak:penugasan']);
+
+// Who may see a photo depends on its report, which the controller checks.
+Route::get('/dokumentasi/{dokumentasi}', FotoDokumentasiController::class)
+    ->name('dokumentasi.foto')
+    ->middleware('auth');
 
 // Available to every signed-in role: a user changes only their own password.
 Route::livewire('/profil', 'pages::profil')

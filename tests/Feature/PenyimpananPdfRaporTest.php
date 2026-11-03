@@ -102,23 +102,21 @@ describe('berkas usang', function (): void {
     });
 });
 
-describe('perintah rapor:amankan-pdf', function (): void {
+describe('perintah rapor:amankan-berkas', function (): void {
     it('memindahkan berkas yang tercatat dan menghapus yang tanpa pemilik', function (): void {
         $publik = Storage::disk('public');
         $berkas = $this->rapor->berkasPdf();
         $this->rapor->forceFill(['File_PDF' => $berkas])->save();
         $publik->put($berkas, '%PDF tercatat');
         $publik->put('rapor/R-9999999.pdf', ISI_LAMA);
-        $publik->put('dokumentasi/foto.jpg', 'foto');
 
-        $this->artisan('rapor:amankan-pdf')
-            ->expectsOutputToContain('1 PDF dipindahkan ke penyimpanan privat, 1 PDF tanpa pemilik dihapus.')
+        $this->artisan('rapor:amankan-berkas')
+            ->expectsOutputToContain('1 berkas dipindahkan ke penyimpanan privat, 1 berkas tanpa pemilik dihapus.')
             ->assertSuccessful();
 
         expect($this->disk->get($berkas))->toBe('%PDF tercatat');
         $publik->assertMissing($berkas);
         $publik->assertMissing('rapor/R-9999999.pdf');
         $this->disk->assertMissing('rapor/R-9999999.pdf');
-        $publik->assertExists('dokumentasi/foto.jpg');
     });
 });

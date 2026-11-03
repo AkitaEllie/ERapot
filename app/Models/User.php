@@ -120,12 +120,17 @@ class User extends Authenticatable
 
     /**
      * Every class this teacher works in: the class they lead as homeroom teacher
-     * and each class they are assigned a subject in.
+     * and each class they are assigned a subject in. An administrator acts for
+     * anyone, so sees them all.
      *
      * @return Builder<Kelas>
      */
     public function kelasDiajar(): Builder
     {
+        if ($this->Role_ID === 'ADMIN') {
+            return Kelas::query();
+        }
+
         return Kelas::query()->where(fn (Builder $query) => $query
             ->where('User_ID', $this->getKey())
             ->orWhereIn('Kelas_ID', $this->pembelajaran()->select('Kelas_ID')));

@@ -62,6 +62,10 @@ new class extends Component
             <p class="text-[13px] text-muted-soft">TK Cinta Kasih Tzu Chi</p>
         </div>
 
+        @if (session('status'))
+            <p role="alert" class="mt-6 rounded border border-rose-200 bg-rose-50 px-3 py-2 text-[14px] text-rose-900">{{ session('status') }}</p>
+        @endif
+
         <form wire:submit="masuk" class="mt-[42px] space-y-5">
             <div>
                 <x-ui.label for="email">Email</x-ui.label>

@@ -120,6 +120,13 @@ it('memberi guru wali kelas akses yang sama dengan guru mata pelajaran', functio
             ->assertOk("guru wali kelas gagal membuka {$path}");
     }
 
+    // The preview is limited to the people working in the report's class.
+    Pembelajaran::factory()->create([
+        'Kelas_ID' => $this->rapor->Kelas_ID,
+        'Mapel_ID' => MataPelajaran::factory()->create()->getKey(),
+        'User_ID' => $this->users['guruWali']->getKey(),
+    ]);
+
     $this->actingAs($this->users['guruWali'])
         ->get(route('rapor.pratinjau', $this->rapor))
         ->assertOk();

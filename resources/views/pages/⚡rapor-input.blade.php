@@ -14,8 +14,8 @@ use App\Models\ProgramPengembangan;
 use App\Models\Rapor;
 use App\Services\GeminiApi;
 use Illuminate\Support\Collection;
-use Illuminate\Support\Facades\Storage;
 use Symfony\Component\HttpKernel\Exception\HttpException;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 use Livewire\Attributes\Computed;
@@ -221,9 +221,10 @@ class extends \Livewire\Component
         try {
             $hasil = app(GeminiApi::class)->kirimPrompt($narasi->susunPrompt());
         } catch (NarasiTidakTersedia $e) {
-            // The provider is unconfigured or failed. Say why rather than leaving
-            // the teacher to guess, and let them write the narrative by hand.
-            session()->flash('galat', $e->getMessage());
+            // The provider is unconfigured or failed. Tell the teacher what to do,
+            // keep the technical cause for the log.
+            Log::warning('Narasi gagal dibuat', ['narasi' => $narasi->getKey(), 'sebab' => $e->getMessage()]);
+            session()->flash('galat', $e->pesanUntukPengguna());
 
             return;
         }
@@ -436,7 +437,7 @@ class extends \Livewire\Component
                     <div class="mt-2 flex gap-4">
                         @foreach ($this->narasi?->dokumentasi ?? [] as $foto)
                             <figure class="relative w-[120px]">
-                                <img src="{{ Storage::url($foto->Foto) }}" alt="{{ $foto->Keterangan }}" class="h-[110px] w-[120px] rounded border border-hairline object-cover">
+                                <img src="{{ $foto->url() }}" alt="{{ $foto->Keterangan }}" class="h-[110px] w-[120px] rounded border border-hairline object-cover">
                                 <figcaption class="mt-1 truncate text-[13px] text-muted">{{ $foto->Keterangan }}</figcaption>
                                 @if ($rapor->bolehDiubah())
                                     <button type="button" wire:click="hapusFoto('{{ $foto->Dokumentasi_ID }}')" class="absolute -top-1.5 -right-1.5 flex size-5 items-center justify-center rounded-full bg-surface text-muted ring-1 ring-hairline transition-colors hover:text-rose-700" aria-label="Hapus foto">&times;</button>

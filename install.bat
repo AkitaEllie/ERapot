@@ -91,7 +91,7 @@ if errorlevel 1 (
 REM --- Penyimpanan dan aset ---
 echo ==^> Menautkan penyimpanan
 php artisan storage:link --ansi >nul 2>&1
-php artisan rapor:amankan-pdf --ansi || exit /b 1
+php artisan rapor:amankan-berkas --ansi || exit /b 1
 
 echo ==^> Membangun aset frontend
 call npm run build || exit /b 1

@@ -2,7 +2,6 @@
 
 use App\Enums\RaporStatus;
 use App\Models\Kelas;
-use App\Models\Pembelajaran;
 use App\Models\Rapor;
 use App\Models\TahunAjaran;
 use Illuminate\Pagination\LengthAwarePaginator;
@@ -56,10 +55,7 @@ class extends Component
     {
         $userId = auth()->id();
 
-        $mengajar = Pembelajaran::query()->where('User_ID', $userId)->select('Kelas_ID');
-
-        return Kelas::query()
-            ->where(fn ($query) => $query->where('User_ID', $userId)->orWhereIn('Kelas_ID', $mengajar))
+        return auth()->user()->kelasDiajar()
             ->when($this->periode, fn ($query) => $query->where('TahunAjaran_ID', $this->periode->getKey()))
             ->orderByRaw('CASE WHEN User_ID = ? THEN 0 ELSE 1 END', [$userId])
             ->orderBy('Nama_Kelas')

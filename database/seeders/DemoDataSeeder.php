@@ -455,7 +455,7 @@ class DemoDataSeeder extends Seeder
 
             ob_start();
             imagejpeg($gambar);
-            Storage::disk('public')->put($relatif, (string) ob_get_clean());
+            Storage::disk(Dokumentasi::DISK)->put($relatif, (string) ob_get_clean());
             imagedestroy($gambar);
 
             $berkas[] = $relatif;

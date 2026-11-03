@@ -166,7 +166,7 @@ class Rapor extends Model
      */
     public function milikWaliKelas(User $user): bool
     {
-        return $user->Role_ID === 'ADMIN' || $this->kelas->User_ID === $user->getKey();
+        return $this->kelas->dikelolaOleh($user);
     }
 
     /**
@@ -414,6 +414,28 @@ class Rapor extends Model
             'kokurikuler' => $bagian->filter(fn (array $b): bool => $b['mapel']->Jenis_Mapel === JenisMataPelajaran::KoKurikuler)->values(),
             'tabel' => $bagian->filter(fn (array $b): bool => $b['mapel']->Jenis_Mapel === JenisMataPelajaran::MuatanLokal)->values(),
         ];
+    }
+
+    /**
+     * Whether this user may read the report: anyone working in the class, plus
+     * whoever decides on approval.
+     */
+    public function bolehDilihatOleh(User $user): bool
+    {
+        return $this->bolehDibukaOleh($user) || (bool) $user->role?->punyaHakAkses('persetujuan');
+    }
+
+    /**
+     * The subject to open this report on for this user: the first one they can
+     * actually fill in, which for a subject teacher is the first one of their own.
+     */
+    public function mapelPertamaUntuk(User $user): ?string
+    {
+        return Pembelajaran::query()
+            ->where('Kelas_ID', $this->Kelas_ID)
+            ->unless($this->milikWaliKelas($user), fn ($query) => $query->where('User_ID', $user->getKey()))
+            ->orderBy('Mapel_ID')
+            ->value('Mapel_ID');
     }
 
     /**

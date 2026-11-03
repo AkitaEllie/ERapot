@@ -133,4 +133,13 @@ class Kelas extends Model
             ->orderBy('Nama_Kelas')
             ->get();
     }
+
+    /**
+     * Whether this user owns the whole class: its homeroom teacher, or an
+     * administrator, who may act for anyone.
+     */
+    public function dikelolaOleh(User $user): bool
+    {
+        return $user->Role_ID === 'ADMIN' || $this->User_ID === $user->getKey();
+    }
 }

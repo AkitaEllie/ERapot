@@ -97,7 +97,7 @@ describe('layar input rapor', function (): void {
     });
 
     it('tidak menghapus foto saat rapor menunggu persetujuan', function (): void {
-        Storage::fake('public');
+        Storage::fake(Dokumentasi::DISK);
         $narasi = Narasi::factory()->create(['Rapor_ID' => $this->rapor->getKey(), 'Mapel_ID' => $this->mapelWali->getKey()]);
         $dokumentasi = Dokumentasi::factory()->create(['Narasi_ID' => $narasi->getKey(), 'Foto' => '']);
         $dokumentasi->unggahFoto(UploadedFile::fake()->image('kegiatan.jpg'));
@@ -110,7 +110,7 @@ describe('layar input rapor', function (): void {
             ->assertSee('tidak dapat diubah');
 
         expect(Dokumentasi::query()->find($dokumentasi->getKey()))->not->toBeNull();
-        Storage::disk('public')->assertExists($dokumentasi->fresh()->Foto);
+        Storage::disk(Dokumentasi::DISK)->assertExists($dokumentasi->fresh()->Foto);
     });
 });
 

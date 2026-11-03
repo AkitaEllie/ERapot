@@ -23,8 +23,35 @@
             ['key' => 'review', 'label' => 'Review Draf Rapor', 'icon' => 'document'],
             ['key' => 'persetujuan', 'label' => 'Persetujuan Rapor', 'icon' => 'check'],
         ],
+        'ADMIN' => [
+            ['key' => 'dashboard', 'label' => 'Dashboard', 'icon' => 'home'],
+            ['key' => 'dashboard-tata-usaha', 'label' => 'Dashboard Tata Usaha', 'icon' => 'home'],
+            ['key' => 'dashboard-kepsekol', 'label' => 'Dashboard Progres', 'icon' => 'home'],
+            ['key' => 'tahun-ajaran', 'label' => 'Tahun Ajaran', 'icon' => 'calendar'],
+            ['key' => 'pengguna', 'label' => 'Data Guru & Pengguna', 'icon' => 'users'],
+            ['key' => 'siswa', 'label' => 'Data Siswa', 'icon' => 'users'],
+            ['key' => 'kelas', 'label' => 'Data Kelas', 'icon' => 'board'],
+            ['key' => 'penempatan', 'label' => 'Penempatan Siswa', 'icon' => 'switch'],
+            ['key' => 'mapel', 'label' => 'Mata Pelajaran', 'icon' => 'book'],
+            ['key' => 'penugasan', 'label' => 'Penugasan Mengajar', 'icon' => 'clipboard'],
+            ['key' => 'indikator', 'label' => 'Indikator Penilaian', 'icon' => 'checklist'],
+            ['key' => 'rapor', 'label' => 'Rapor Siswa', 'icon' => 'document'],
+            ['key' => 'ekspor', 'label' => 'Daftar Rapor & Export', 'icon' => 'download'],
+            ['key' => 'review', 'label' => 'Review Draf Rapor', 'icon' => 'document'],
+            ['key' => 'persetujuan', 'label' => 'Persetujuan Rapor', 'icon' => 'check'],
+        ],
         default => [],
     };
+
+    // The staff dashboards all report 'dashboard' as active, but an administrator's
+    // menu lists them separately.
+    if (auth()->user()?->Role_ID === 'ADMIN') {
+        $active = match (true) {
+            request()->routeIs('dashboard.tata-usaha') => 'dashboard-tata-usaha',
+            request()->routeIs('dashboard.kepsekol*') => 'dashboard-kepsekol',
+            default => $active,
+        };
+    }
 
     $roleLabel = match (auth()->user()?->Role_ID) {
         'GURU' => 'GURU',

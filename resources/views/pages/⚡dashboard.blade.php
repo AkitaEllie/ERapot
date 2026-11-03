@@ -68,7 +68,7 @@ class extends Component
                 'kelas' => $kelas,
                 // Only the subjects this teacher is assigned, never someone else's.
                 'mapel' => $kelas->pembelajaran
-                    ->where('User_ID', $user->getKey())
+                    ->when($user->Role_ID !== 'ADMIN', fn ($pembelajaran) => $pembelajaran->where('User_ID', $user->getKey()))
                     ->map(fn ($pembelajaran) => $pembelajaran->mataPelajaran?->Nama_Mapel)
                     ->filter()
                     ->join(', ') ?: null,
@@ -91,7 +91,7 @@ class extends Component
         return Rapor::query()
             ->whereIn('Kelas_ID', $kelasIds)
             ->denganStatus(RaporStatus::PerluRevisi)
-            ->with(['siswa', 'kelas', 'narasi.mataPelajaran'])
+            ->with(['siswa', 'kelas'])
             ->latest()
             ->limit(5)
             ->get();
@@ -197,7 +197,7 @@ class extends Component
                                         perlu diperbaiki: {{ $rapor->Catatan_Revisi }}
                                     </p>
                                 </div>
-                                @php $mapelPertama = $rapor->narasi->first()?->Mapel_ID ?? $rapor->mataPelajaranRapor()->value('Mapel_ID'); @endphp
+                                @php $mapelPertama = $rapor->mapelPertamaUntuk(auth()->user()); @endphp
                                 <x-ui.button-link :href="$mapelPertama ? route('rapor.input', ['rapor' => $rapor->getKey(), 'mapel' => $mapelPertama]) : route('rapor.data-fisik', $rapor)">Buka Rapor</x-ui.button-link>
                             </div>
                         @endforeach

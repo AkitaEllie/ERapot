@@ -173,7 +173,7 @@ class extends \Livewire\Component
                                 @if ($narasi->dokumentasi->isNotEmpty())
                                     <div class="mt-3 flex gap-3">
                                         @foreach ($narasi->dokumentasi as $foto)
-                                            <img src="{{ Storage::url($foto->Foto) }}" alt="{{ $foto->Keterangan }}" class="h-[52px] w-[110px] rounded border border-hairline object-cover">
+                                            <img src="{{ $foto->url() }}" alt="{{ $foto->Keterangan }}" class="h-[52px] w-[110px] rounded border border-hairline object-cover">
                                         @endforeach
                                     </div>
                                 @endif
