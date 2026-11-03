@@ -120,6 +120,14 @@ it('menyertakan gaya catatan pada prompt mata pelajaran muatan lokal', function 
         ->not->toContain('Tulis tiga paragraf');
 });
 
+it('menyertakan daftar bernomor pada prompt mata pelajaran kokurikuler', function (): void {
+    $prompt = narasiDenganCapaian(jenis: JenisMataPelajaran::KoKurikuler)->susunPrompt();
+
+    expect($prompt)
+        ->toContain('daftar bernomor')
+        ->not->toContain('Tulis tiga paragraf');
+});
+
 it('tetap menyusun prompt walau tanpa capaian dan catatan', function (): void {
     $narasi = narasiDenganCapaian();
     $narasi->update(['Catatan_Guru' => null]);
@@ -169,6 +177,10 @@ describe('instruksi sistem', function (): void {
         expect(InstruksiNarasi::SISTEM)->toContain('Sebut nama anak pada kalimat pertama saja');
     });
 
+    it('melarang mengarang fakta di luar capaian dan catatan guru', function (): void {
+        expect(InstruksiNarasi::SISTEM)->toContain('Gunakan hanya fakta dari capaian dan catatan guru');
+    });
+
     it('ditulis dalam bahasa Indonesia', function (): void {
         expect(InstruksiNarasi::SISTEM)->toContain('bahasa Indonesia');
     });
@@ -180,9 +192,9 @@ describe('gaya per bentuk halaman', function (): void {
             ->toBe(InstruksiNarasi::GAYA_PROSA);
     });
 
-    it('memilih gaya prosa untuk mata pelajaran kokurikuler', function (): void {
+    it('memilih gaya proyek untuk mata pelajaran kokurikuler', function (): void {
         expect(InstruksiNarasi::gaya(JenisMataPelajaran::KoKurikuler))
-            ->toBe(InstruksiNarasi::GAYA_PROSA);
+            ->toBe(InstruksiNarasi::GAYA_PROYEK);
     });
 
     it('memilih gaya catatan untuk mata pelajaran muatan lokal', function (): void {
@@ -204,6 +216,15 @@ describe('gaya per bentuk halaman', function (): void {
             ->and(InstruksiNarasi::GAYA_CATATAN)->toContain('Jangan membuat daftar');
     });
 
+    it('meminta daftar bernomor dimensi hanya pada gaya proyek', function (): void {
+        // The reference's Kokurikuler page numbers the graduate dimensions.
+        expect(InstruksiNarasi::GAYA_PROYEK)
+            ->toContain('daftar bernomor')
+            ->toContain('8 dimensi lulusan')
+            ->toContain('Penalaran Kritis')
+            ->and(InstruksiNarasi::GAYA_PROSA)->not->toContain('daftar bernomor');
+    });
+
     it('meminta satu paragraf pada gaya catatan', function (): void {
         expect(InstruksiNarasi::GAYA_CATATAN)->toContain('satu paragraf saja');
     });
@@ -212,6 +233,7 @@ describe('gaya per bentuk halaman', function (): void {
         // The model honours a word target only when it is explicit, and the
         // sentence wraps inside the heredoc.
         expect(InstruksiNarasi::GAYA_PROSA)->toContain('Jumlah kata ini')
+            ->and(InstruksiNarasi::GAYA_PROYEK)->toContain('Jumlah kata ini')
             ->and(InstruksiNarasi::GAYA_CATATAN)->toContain('Jumlah kata ini');
     });
 });

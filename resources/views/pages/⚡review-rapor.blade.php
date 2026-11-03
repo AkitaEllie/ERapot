@@ -168,9 +168,7 @@ class extends \Livewire\Component
                         @foreach ($rapor->narasi as $narasi)
                             <article class="rounded border border-hairline p-4">
                                 <h3 class="text-[15px] font-semibold text-heading">{{ $narasi->mataPelajaran?->Nama_Mapel ?? 'Mata Pelajaran' }}</h3>
-                                <p class="mt-1.5 text-[15px] leading-relaxed text-body">
-                                    {{ $narasi->Narasi_Final ?: $narasi->Draft_Narasi ?: 'Belum ada narasi.' }}
-                                </p>
+                                <p class="mt-1.5 text-[15px] leading-relaxed whitespace-pre-line text-body">{{ $narasi->Narasi_Final ?: $narasi->Draft_Narasi ?: 'Belum ada narasi.' }}</p>
 
                                 @if ($narasi->dokumentasi->isNotEmpty())
                                     <div class="mt-3 flex gap-3">

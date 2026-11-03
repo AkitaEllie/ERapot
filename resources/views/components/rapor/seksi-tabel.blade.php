@@ -88,18 +88,9 @@
                         {{ strtolower($rapor->Semester->label()) }} ini {{ $ejaan[$keseluruhan] ?? 'belum diisi' }}
                         ({{ $keseluruhan }}).
                     </p>
-                    @php
-                        $teksCatatan = $narasi?->Status_Narasi === \App\Enums\StatusNarasi::Final
-                            ? $narasi?->Narasi_Final
-                            : $narasi?->Draft_Narasi;
-                    @endphp
-                    @forelse (preg_split('/\n{2,}/', (string) $teksCatatan) as $paragraf)
-                        @if (trim($paragraf) !== '')
-                            <p class="mb-2 last:mb-0 text-justify whitespace-pre-line">{{ trim($paragraf) }}</p>
-                        @endif
-                    @empty
-                        <p class="text-[#888]">Belum ada catatan.</p>
-                    @endforelse
+                    <div class="text-justify">
+                        <x-rapor.teks-narasi :teks="$narasi?->teks()" kosong="Belum ada catatan." />
+                    </div>
                 </td>
 
                 @if ($foto !== null)
@@ -131,20 +122,20 @@
 
             <tr>
                 <td class="w-[110px] border border-[#333] bg-[#f2f2f2] px-2 py-4 text-center font-bold" rowspan="2">Tanda Tangan</td>
-                <td class="border border-[#333] px-2 py-1 text-center font-bold">Guru {{ $mapel->Nama_Mapel }}</td>
-                <td class="border border-[#333] px-2 py-1 text-center">{{ $pengampu?->Nama ?? '' }}</td>
+                <td class="border border-[#333] px-2 py-1 text-center font-bold" style="height: 40px;">Guru {{ $mapel->Nama_Mapel }}</td>
+                <td class="border border-[#333] px-2 py-1 text-center align-bottom">{{ $pengampu?->Nama ?? '' }}</td>
             </tr>
             <tr>
-                <td class="border border-[#333] px-2 py-8 text-center font-bold align-top">Orang Tua / Wali</td>
+                <td class="border border-[#333] px-2 py-8 text-center font-bold align-top" style="height: 40px;">Orang Tua / Wali</td>
                 <td class="border border-[#333] px-2 py-8"></td>
             </tr>
         </tbody>
     </table>
 
-    <div class="mt-4 text-right text-[13px] leading-relaxed">
+    <div class="tetap-bersama mt-4 text-right text-[13px] leading-relaxed">
         <p>Jakarta, {{ optional($rapor->Tanggal_Cetak)->translatedFormat('j F Y') ?? now()->translatedFormat('j F Y') }}</p>
         <p>Ka KB/TK Cinta Kasih Tzu Chi</p>
-        <p class="mt-10">Sandra Devi, S.Pd., M.M.</p>
+        <p class="tanda-tangan mt-10">{{ $rapor->namaKepalaSekolah() }}</p>
     </div>
 </section>
 

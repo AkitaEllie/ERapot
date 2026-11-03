@@ -414,6 +414,22 @@ class Rapor extends Model
     }
 
     /**
+     * The principal named on the printed report: whoever approved it, otherwise
+     * the current principal. An administrator's approval does not put their name
+     * on the school's signature line.
+     */
+    public function namaKepalaSekolah(): ?string
+    {
+        $penyetuju = $this->disetujuiOleh;
+
+        if ($penyetuju?->Role_ID === 'KEPSEKOL') {
+            return $penyetuju->Nama;
+        }
+
+        return User::query()->active()->where('Role_ID', 'KEPSEKOL')->value('Nama');
+    }
+
+    /**
      * Render this report card to a PDF and return its path on the public disk.
      *
      * Renders the complete document, which is what the homeroom teacher exports.

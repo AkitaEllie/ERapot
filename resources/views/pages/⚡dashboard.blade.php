@@ -194,7 +194,6 @@ class extends Component
                                     <p class="text-[16px] font-semibold text-heading">Rapor dikembalikan Kepala Sekolah</p>
                                     <p class="mt-1 text-[15px] text-muted">
                                         {{ $rapor->siswa?->Nama }} - {{ $rapor->kelas?->Nama_Kelas }}
-                                        - {{ $rapor->narasi->first()?->mataPelajaran?->Nama_Mapel ?? 'Narasi' }}
                                         perlu diperbaiki: {{ $rapor->Catatan_Revisi }}
                                     </p>
                                 </div>

@@ -3,15 +3,17 @@
      effect in the PDF, where the compiled bundle is absent. --}}
 @props(['rapor'])
 
+{{-- One block, so the principal's name can never land alone on the next page. --}}
+<div class="tetap-bersama">
 <section class="mb-6 break-inside-avoid">
     <p class="mb-2 font-bold">Refleksi orang tua:</p>
 
-    <div class="border border-[#333] p-2 text-[13px]">
+    <div class="kotak-refleksi border border-[#333] p-2 text-[13px]">
         <p>1. Apa yang sudah berkembang yang saya amati dari anak ?</p>
         <div style="height: 110px;"></div>
     </div>
 
-    <div class="border border-t-0 border-[#333] p-2 text-[13px]">
+    <div class="kotak-refleksi border border-t-0 border-[#333] p-2 text-[13px]">
         <p>2. Apa yang perlu dikembangkan dari anak menurut yang saya amati ?</p>
         <div style="height: 110px;"></div>
     </div>
@@ -33,10 +35,10 @@
                 <p>Izin : {{ $rapor->Izin }} Hari</p>
                 <p>Tanpa keterangan : {{ $rapor->Tanpa_Keterangan }} Hari</p>
             </td>
-            <td class="border border-[#333] px-2 py-10 text-center align-bottom">
+            <td class="border border-[#333] px-2 py-10 text-center align-bottom" style="height: 80px;">
                 ( {{ $rapor->kelas->waliKelas?->Nama ?? '                              ' }} )
             </td>
-            <td class="border border-[#333] px-2 py-10 text-center align-bottom">(                              )</td>
+            <td class="border border-[#333] px-2 py-10 text-center align-bottom" style="height: 80px;">(&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;)</td>
         </tr>
     </tbody>
 </table>
@@ -44,5 +46,6 @@
 <div class="mt-6 text-right text-[13px] leading-relaxed">
     <p>Jakarta, {{ optional($rapor->Tanggal_Cetak)->translatedFormat('j F Y') ?? now()->translatedFormat('j F Y') }}</p>
     <p>Ka KB/TK Cinta Kasih Tzu Chi</p>
-    <p class="mt-10">Sandra Devi, S.Pd., M.M.</p>
+    <p class="tanda-tangan mt-10">{{ $rapor->namaKepalaSekolah() }}</p>
+</div>
 </div>

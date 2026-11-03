@@ -31,22 +31,31 @@
     @if ($identitas)
         @include('components.rapor.identitas', ['rapor' => $rapor])
 
+        {{-- Each letter heading shares a block with its first subject, so it is never
+             stranded at the foot of a page. --}}
         @if ($intrakurikuler->isNotEmpty())
-            <h2 class="mt-6 mb-3 font-bold">A. INTRAKURIKULER</h2>
-            @foreach ($intrakurikuler as $item)
+            <div class="tetap-bersama">
+                <h2 class="judul-bagian mt-6 mb-3 font-bold">A. INTRAKURIKULER</h2>
+                <x-rapor.seksi-prosa :narasi="$intrakurikuler->first()['narasi']" :mapel="$intrakurikuler->first()['mapel']" :untuk-pdf="$untukPdf" />
+            </div>
+            @foreach ($intrakurikuler->skip(1) as $item)
                 <x-rapor.seksi-prosa :narasi="$item['narasi']" :mapel="$item['mapel']" :untuk-pdf="$untukPdf" />
             @endforeach
         @endif
 
         @if ($kokurikuler->isNotEmpty())
-            <h2 class="mt-8 mb-3 font-bold">B. KOKURIKULER</h2>
             @foreach ($kokurikuler as $item)
-                <x-rapor.seksi-prosa
-                    :narasi="$item['narasi']"
-                    :mapel="$item['mapel']"
-                    :judul="'Deskripsi Pengembangan Proyek ('.$item['mapel']->Nama_Mapel.')'"
-                    :untuk-pdf="$untukPdf"
-                />
+                <div @class(['tetap-bersama' => $loop->first])>
+                    @if ($loop->first)
+                        <h2 class="judul-bagian mt-8 mb-3 font-bold">B. KOKURIKULER</h2>
+                    @endif
+                    <x-rapor.seksi-prosa
+                        :narasi="$item['narasi']"
+                        :mapel="$item['mapel']"
+                        :judul="'Deskripsi Pengembangan Proyek ('.$item['mapel']->Nama_Mapel.')'"
+                        :untuk-pdf="$untukPdf"
+                    />
+                </div>
             @endforeach
         @endif
 
@@ -55,7 +64,7 @@
 
     {{-- Table-template subjects, one page each. --}}
     @foreach ($tabel as $item)
-        <div class="{{ $loop->first && ! $identitas ? '' : 'mt-12 border-t-2 border-dashed border-hairline pt-10' }}">
+        <div class="{{ $loop->first && ! $identitas ? '' : 'halaman-baru mt-12 border-t-2 border-dashed border-hairline pt-10' }}">
             <x-rapor.seksi-tabel
                 :narasi="$item['narasi']"
                 :mapel="$item['mapel']"
