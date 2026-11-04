@@ -1,9 +1,10 @@
 {{-- A stored narrative, printed the same way on every template.
 
      Blank lines separate blocks. Inside a block, a line starting with a number or
-     a dash opens a list item, and the plain lines after it are that item's
-     description, as on the Kokurikuler page of docs/contoh-rapor.pdf. Marked up
-     line by line because dompdf cannot hang a description under its number. --}}
+     a dash is a list item. The plain lines after a numbered item are its description,
+     as on the Kokurikuler page of docs/contoh-rapor.pdf; a dash item takes none, so
+     a sentence after a bullet list is ordinary text. Marked up line by line because
+     dompdf cannot hang a description under its number. --}}
 @props(['teks' => null, 'kosong' => 'Belum ada narasi.'])
 
 @php
@@ -11,14 +12,16 @@
 @endphp
 
 @forelse ($blok as $isi)
-    @php $dalamDaftar = false; @endphp
+    @php $bawahNomor = false; @endphp
     @foreach (preg_split('/\R/u', $isi) as $baris)
         @php
             $baris = trim($baris);
-            $butir = preg_match('/^(\d+[.)]|[-•])\s+/u', $baris) === 1;
-            $dalamDaftar = $dalamDaftar || $butir;
+            $bernomor = preg_match('/^\d+[.)]\s+/u', $baris) === 1;
+            $butir = $bernomor || preg_match('/^[-•]\s+/u', $baris) === 1;
+            $rincian = ! $butir && $bawahNomor;
+            $bawahNomor = $bernomor || $rincian;
         @endphp
-        <p class="{{ $butir ? 'narasi-butir' : ($dalamDaftar ? 'narasi-rincian' : 'mb-2') }}">{{ $baris }}</p>
+        <p class="{{ $butir ? 'narasi-butir' : ($rincian ? 'narasi-rincian' : 'mb-2') }}">{{ $baris }}</p>
     @endforeach
 @empty
     <p class="text-[#888]">{{ $kosong }}</p>

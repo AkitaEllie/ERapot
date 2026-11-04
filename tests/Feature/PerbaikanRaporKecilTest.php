@@ -14,6 +14,7 @@ use App\Models\User;
 use Database\Seeders\DemoDataSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Blade;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Storage;
 use Livewire\Livewire;
 
@@ -44,6 +45,11 @@ describe('teks narasi pada rapor', function (): void {
     it('menandai daftar berpoin sebagai butir', function (): void {
         expect(teksNarasi("- Berdoa sebelum makan\n- Berbagi bekal"))
             ->toContain('<p class="narasi-butir">- Berdoa sebelum makan</p>');
+    });
+
+    it('menganggap kalimat setelah daftar berpoin sebagai teks biasa', function (): void {
+        expect(teksNarasi("- Berdoa sebelum makan\nSikap itu tampak di kelas."))
+            ->toContain('<p class="mb-2">Sikap itu tampak di kelas.</p>');
     });
 
     it('tidak menganggap angka di awal kalimat biasa sebagai butir', function (): void {
@@ -164,4 +170,64 @@ it('mengisi data demo dengan narasi atas nama tiap anak dan penyetujunya', funct
         ->not->toContain('Andini')
         ->and($bima->namaKepalaSekolah())->toBe('Ibu Mei')
         ->and($bima->Tanggal_Persetujuan)->not->toBeNull();
+});
+
+describe('data contoh', function (): void {
+    beforeEach(function (): void {
+        Storage::fake(Dokumentasi::DISK);
+        $this->seed(DemoDataSeeder::class);
+    });
+
+    it('membedakan catatan dan data tiap anak', function (): void {
+        $catatan = Narasi::query()->pluck('Catatan_Guru');
+
+        expect($catatan->unique()->count())->toBe($catatan->count())
+            ->and(Rapor::query()->whereNotNull('Tinggi_Badan')->pluck('Tinggi_Badan')->unique()->count())->toBeGreaterThan(5);
+    });
+
+    it('menyiapkan rapor yang diajukan agar lengkap dan siap disetujui', function (): void {
+        $clarissa = Rapor::query()->whereRelation('siswa', 'Nama', 'Clarissa Wijaya')->firstOrFail();
+
+        expect($clarissa->Status)->toBe(RaporStatus::Menunggu)
+            ->and($clarissa->kekuranganPengajuan())->toBeEmpty();
+    });
+
+    it('menyiapkan rapor yang siap dibuatkan narasi oleh AI', function (): void {
+        $gabriela = Rapor::query()->whereRelation('siswa', 'Nama', 'Gabriela Tanu')->firstOrFail();
+
+        expect($gabriela->narasi)->toHaveCount(8)
+            ->and($gabriela->narasi->every(fn (Narasi $n): bool => filled($n->Catatan_Guru) && blank($n->Draft_Narasi)))->toBeTrue();
+    });
+
+    it('tidak memberi foto yang sama pada dua rapor', function (): void {
+        $foto = Dokumentasi::query()->pluck('Foto');
+
+        expect($foto->unique()->count())->toBe($foto->count());
+    });
+
+    it('memberi kelas guru wali, bukan administrator', function (): void {
+        expect(Kelas::query()->whereRelation('waliKelas', 'Role_ID', 'ADMIN')->count())->toBe(0);
+    });
+
+    it('membuat narasi contoh, menyimpannya, dan melanjutkan yang tersisa', function (): void {
+        $berkas = tempnam(sys_get_temp_dir(), 'narasi');
+        file_put_contents($berkas, json_encode(['0154872301' => ['agama' => 'Sudah ada']]));
+        config([
+            'ai.default' => 'openai',
+            'ai.providers.openai.key' => 'kunci-uji',
+            'ai.providers.openai.model' => 'model-uji',
+            'ai.providers.openai.base_url' => 'https://ai.test/v1',
+        ]);
+        Http::fake(['ai.test/*' => Http::response(['choices' => [['message' => ['content' => 'Narasi baru.']]]])]);
+
+        $this->artisan('rapor:contoh-narasi', ['--berkas' => $berkas])->assertSuccessful();
+
+        $isi = json_decode(file_get_contents($berkas), true);
+        unlink($berkas);
+
+        expect($isi['0154872301']['agama'])->toBe('Sudah ada')
+            ->and($isi['0154872301']['jati'])->toBe('Narasi baru.')
+            ->and($isi['0154872304'])->toHaveKeys(['agama', 'inggris'])
+            ->and($isi['0154872304'])->not->toHaveKey('jati');
+    });
 });

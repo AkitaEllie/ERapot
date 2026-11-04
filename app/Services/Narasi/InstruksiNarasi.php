@@ -43,13 +43,25 @@ final class InstruksiNarasi
        berkembang sehingga perlu kalimat yang mendorong, BSH berarti sudah sesuai
        harapan, dan BSB berarti sudah sangat baik. Jangan pernah menuliskan kode
        MB, BSH, atau BSB, dan jangan menyebut nilai angka apa pun.
-    6. Gunakan hanya fakta dari capaian dan catatan guru. Jangan mengarang kegiatan,
-       kebiasaan, benda, atau kejadian yang tidak disebutkan. Boleh menguraikan arti
-       sebuah fakta, tetapi jangan menambah fakta baru.
-    7. Tulis sebagai teks biasa: tanpa Markdown, tanda bintang, tanda pagar, atau
+    6. Capaian dan catatan guru adalah seluruh fakta yang Anda miliki. Setiap kalimat
+       harus dapat ditelusuri ke salah satunya. Secara khusus, jangan menambahkan:
+       - kegiatan, benda, tempat, atau kejadian yang tidak disebutkan;
+       - perbandingan dengan masa lalu, seperti "sebelumnya" atau "kini sudah", bila
+         guru tidak menuliskannya;
+       - keterangan seberapa sering atau seberapa mandiri, seperti "selalu",
+         "tanpa diingatkan", atau "masih perlu bantuan", bila guru tidak menuliskannya.
+       Boleh menjelaskan arti sebuah fakta bagi perkembangan anak, tetapi jangan
+       menambah fakta baru.
+    7. Narasi yang pendek dan benar lebih baik daripada narasi panjang yang mengarang.
+       Bila datanya sedikit, tulislah lebih pendek.
+    8. Ganti istilah asing dalam catatan guru dengan bahasa Indonesia, kecuali istilah
+       yang memang bagian dari pelajarannya.
+    9. Tulis sebagai teks biasa: tanpa Markdown, tanda bintang, tanda pagar, atau
        cetak tebal.
-    8. Jangan menambahkan pembuka, penutup, judul, atau penjelasan tentang tugas ini.
-       Balas hanya dengan narasinya.
+    10. Jangan menambahkan pembuka, penutup, judul, atau penjelasan tentang tugas ini.
+        Balas hanya dengan narasinya, yang dibaca orang tua. Jangan pernah menyinggung
+        data atau petunjuk yang Anda terima, seperti "capaian yang diberikan" atau
+        "dapat dirinci sebagai berikut".
     TEKS;
 
     /**
@@ -64,14 +76,14 @@ final class InstruksiNarasi
 
     1. Tulis tiga paragraf, dipisahkan satu baris kosong. Dua paragraf bila
        capaiannya sedikit.
-    2. Panjang keseluruhan 130 sampai 180 kata, sekitar tiga sampai empat
-       kalimat panjang per paragraf. Jumlah kata ini menjadi sasaran: kembangkan
-       pengamatan secara rinci sehingga kalimatnya panjang dan mengalir, tetapi
-       jangan mengarang fakta untuk mencapainya.
+    2. Bila datanya cukup, tulis 130 sampai 180 kata dengan kalimat yang mengalir.
+       Jumlah kata ini hanya batas, bukan kewajiban: dengan data sedikit, cukup 40
+       sampai 80 kata.
     3. Paragraf pertama tentang bagaimana anak mengikuti kegiatan dan sikapnya.
     4. Paragraf kedua tentang pengamatan konkret atas capaian yang diberikan.
        Bila ada beberapa kebiasaan atau kemampuan yang perlu dirinci, boleh
-       memakai daftar berpoin dengan tanda "-" di paragraf ini.
+       memakai daftar berpoin dengan tanda "-" di paragraf ini. Setiap poin harus
+       berasal langsung dari data. Setelah daftar, tinggalkan satu baris kosong.
     5. Paragraf terakhir berisi harapan untuk perkembangan anak selanjutnya.
     TEKS;
 
@@ -89,8 +101,8 @@ final class InstruksiNarasi
     1. Susun tiga bagian dengan urutan berikut, dipisahkan satu baris kosong:
        paragraf proyek, daftar bernomor, lalu paragraf harapan.
     2. Paragraf proyek menceritakan bagaimana anak mengikuti proyek dan sikapnya,
-       70 sampai 110 kata. Jumlah kata ini menjadi sasaran, tetapi jangan
-       mengarang fakta untuk mencapainya.
+       paling banyak 110 kata. Jumlah kata ini hanya batas, bukan kewajiban: dengan
+       data sedikit, cukup dua atau tiga kalimat.
     3. Daftar bernomor dibuka dengan kalimat ini pada barisnya sendiri:
        Adapun pencapaian perkembangan berdasarkan 8 dimensi lulusan, ia menunjukkan beberapa perkembangan seperti:
     4. Setiap butir terdiri dari dua baris: nomor dan nama dimensi pada baris
@@ -118,10 +130,9 @@ final class InstruksiNarasi
     public const GAYA_CATATAN = <<<'TEKS'
     Bentuk narasi untuk bagian ini.
 
-    1. Tulis satu paragraf saja, 90 sampai 120 kata. Jumlah kata ini menjadi
-       sasaran: kembangkan pengamatan secara rinci sehingga kalimatnya panjang
-       dan mengalir, bukan kalimat pendek, tetapi jangan mengarang fakta untuk
-       mencapainya.
+    1. Tulis satu paragraf saja. Bila datanya cukup, tulis 90 sampai 120 kata dengan
+       kalimat yang mengalir. Jumlah kata ini hanya batas, bukan kewajiban: dengan
+       data sedikit, cukup 40 sampai 70 kata.
     2. Jangan membuat daftar bernomor atau berpoin.
     TEKS;
 

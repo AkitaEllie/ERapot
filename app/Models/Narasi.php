@@ -14,6 +14,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Str;
 
 /**
  * A subject-level narrative inside a report card.
@@ -27,6 +28,9 @@ use Illuminate\Support\Carbon;
  * @property StatusNarasi $Status_Narasi
  * @property Carbon|null $Tanggal_Generate
  * @property Carbon|null $Tanggal_Edit
+ * @property string|null $Generate_Token
+ * @property Carbon|null $Generate_Mulai
+ * @property string|null $Generate_Galat
  */
 #[Fillable([
     'Narasi_ID', 'Rapor_ID', 'Mapel_ID', 'Catatan_Guru',
@@ -47,6 +51,12 @@ class Narasi extends Model
     protected $table = 'narasi';
 
     /**
+     * How long a queued generation may stay unanswered before it counts as lost.
+     * Generous, because it includes waiting behind other teachers' requests.
+     */
+    public const BATAS_GENERATE_MENIT = 15;
+
+    /**
      * @return array<string, string>
      */
     protected function casts(): array
@@ -55,6 +65,7 @@ class Narasi extends Model
             'Status_Narasi' => StatusNarasi::class,
             'Tanggal_Generate' => 'datetime',
             'Tanggal_Edit' => 'datetime',
+            'Generate_Mulai' => 'datetime',
         ];
     }
 
@@ -170,6 +181,78 @@ class Narasi extends Model
     }
 
     /**
+     * Record that a background generation has been requested. The token identifies
+     * this request, so only its own job may write the result.
+     */
+    public function mulaiGenerate(): string
+    {
+        $token = (string) Str::uuid();
+
+        $this->forceFill([
+            'Generate_Token' => $token,
+            'Generate_Mulai' => now(),
+            'Generate_Galat' => null,
+        ])->save();
+
+        return $token;
+    }
+
+    /**
+     * Whether a generation is pending and has not been given up on.
+     */
+    public function sedangGenerate(): bool
+    {
+        return filled($this->Generate_Token) && ! $this->generateTerlambat();
+    }
+
+    /**
+     * Whether a pending generation has gone unanswered too long: usually a sign
+     * that no queue worker is running.
+     */
+    public function generateTerlambat(): bool
+    {
+        return filled($this->Generate_Token)
+            && ($this->Generate_Mulai === null
+                || $this->Generate_Mulai->lt(now()->subMinutes(self::BATAS_GENERATE_MENIT)));
+    }
+
+    /**
+     * Whether a job's result is still wanted: its request is the current one, and
+     * the report was not locked while the provider was working.
+     */
+    public function masihDitunggu(string $token): bool
+    {
+        return $this->Generate_Token === $token && $this->rapor->bolehDiubah();
+    }
+
+    public function selesaiGenerate(string $token, string $teks): void
+    {
+        if ($this->Generate_Token !== $token) {
+            return;
+        }
+
+        $this->simpanDraft($teks);
+        $this->forceFill(['Generate_Token' => null, 'Generate_Mulai' => null, 'Generate_Galat' => null])->save();
+    }
+
+    public function gagalGenerate(string $token, string $pesan): void
+    {
+        if ($this->Generate_Token !== $token) {
+            return;
+        }
+
+        $this->forceFill(['Generate_Token' => null, 'Generate_Mulai' => null, 'Generate_Galat' => $pesan])->save();
+    }
+
+    /**
+     * Stop waiting. A job already running finds its token gone and drops its result.
+     */
+    public function batalkanGenerate(): void
+    {
+        $this->forceFill(['Generate_Token' => null, 'Generate_Mulai' => null, 'Generate_Galat' => null])->save();
+    }
+
+    /**
      * Save the teacher's own note about this narrative.
      *
      * @todo Implement per the class diagram.
@@ -200,6 +283,7 @@ class Narasi extends Model
             'Draft_Narasi' => $teks,
             'Status_Narasi' => StatusNarasi::Diedit,
             'Tanggal_Edit' => now(),
+            'Generate_Galat' => null,
         ])->save();
     }
 

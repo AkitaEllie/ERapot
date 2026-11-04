@@ -132,10 +132,17 @@
         </tbody>
     </table>
 
-    <div class="tetap-bersama mt-4 text-right text-[13px] leading-relaxed">
-        <p>Jakarta, {{ optional($rapor->Tanggal_Cetak)->translatedFormat('j F Y') ?? now()->translatedFormat('j F Y') }}</p>
-        <p>Ka KB/TK Cinta Kasih Tzu Chi</p>
-        <p class="tanda-tangan mt-10">{{ $rapor->namaKepalaSekolah() }}</p>
-    </div>
+    {{-- A table row, because dompdf splits a div across pages but moves a row whole. --}}
+    <table class="penutup-halaman mt-4 w-full text-[13px] leading-relaxed">
+        <tbody>
+            <tr>
+                <td class="border-0 text-right">
+                    <p>Jakarta, {{ optional($rapor->Tanggal_Cetak)->translatedFormat('j F Y') ?? now()->translatedFormat('j F Y') }}</p>
+                    <p>Ka KB/TK Cinta Kasih Tzu Chi</p>
+                    <p class="tanda-tangan mt-10">{{ $rapor->namaKepalaSekolah() }}</p>
+                </td>
+            </tr>
+        </tbody>
+    </table>
 </section>
 

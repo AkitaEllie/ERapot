@@ -42,6 +42,7 @@ Seluruh akun memakai kata sandi `rahasia-kuat`.
 
 | Peran | Surel | Bisa apa |
 | --- | --- | --- |
+| Administrator | `admin@tkcktc.sch.id` | Seluruh layar dan seluruh kelas |
 | Guru Wali Kelas | `sari@tkcktc.sch.id` | Satu kelas, menyusun dan mengekspor seluruh buku rapor |
 | Guru Mata Pelajaran | `ratna@tkcktc.sch.id` | Mata pelajaran yang diampu di semua kelas |
 | Tata Usaha | `andre@tkcktc.sch.id` | Akun, siswa, kelas, mata pelajaran, penugasan |

@@ -23,6 +23,7 @@ use App\Models\Siswa;
 use App\Models\TahunAjaran;
 use App\Models\User;
 use Illuminate\Database\Seeder;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
@@ -70,6 +71,7 @@ class DemoDataSeeder extends Seeder
             'Email' => 'dewi@tkcktc.sch.id',
             'Password' => Hash::make('rahasia-kuat'),
         ]);
+        User::factory()->create(['Role_ID' => 'ADMIN', 'Nama' => 'Administrator', 'Email' => 'admin@tkcktc.sch.id', 'Password' => Hash::make('rahasia-kuat')]);
         User::factory()->create(['Role_ID' => 'TATAUSA', 'Nama' => 'Pak Andre', 'Email' => 'andre@tkcktc.sch.id', 'Password' => Hash::make('rahasia-kuat')]);
         $kepalaSekolah = User::factory()->create(['Role_ID' => 'KEPSEKOL', 'Nama' => 'Ibu Mei', 'Email' => 'mei@tkcktc.sch.id', 'Password' => Hash::make('rahasia-kuat')]);
 
@@ -148,6 +150,7 @@ class DemoDataSeeder extends Seeder
         foreach ([['TK-B Gratitude', Jenjang::Tkb], ['TK-B Compassion', Jenjang::Tkb], ['KB Harmony', Jenjang::Kba], ['KB Serenity', Jenjang::Kbb]] as [$nama, $jenjang]) {
             Kelas::factory()->create([
                 'TahunAjaran_ID' => $periode->getKey(),
+                'User_ID' => User::factory()->create(['Role_ID' => 'GURUWALI'])->getKey(),
                 'Nama_Kelas' => $nama,
                 'Jenjang' => $jenjang,
             ]);
@@ -178,6 +181,7 @@ class DemoDataSeeder extends Seeder
         // one unassigned teaching slot so the "belum ada guru pengampu" task appears
         $kelasKosong = Kelas::factory()->create([
             'TahunAjaran_ID' => $periode->getKey(),
+            'User_ID' => User::factory()->create(['Role_ID' => 'GURUWALI'])->getKey(),
             'Nama_Kelas' => 'TK-C Karakter',
             'Jenjang' => Jenjang::Tkb,
         ]);
@@ -283,40 +287,21 @@ class DemoDataSeeder extends Seeder
             'Nama_Program' => 'Proyek Penguatan Profil Pelajar Pancasila - Alat Transportasi',
         ]);
 
-        // Keyed by the seeded subject name: the narrative loop below looks each one
-        // up and creates the matching Narasi row.
-        $narasiTeks = [
-            'Nilai-nilai Agama & Budi Pekerti' => 'Andini terbiasa berdoa sebelum kegiatan tanpa diingatkan. Ia juga mulai menunjukkan sikap menghargai teman yang berbeda keyakinan saat kegiatan bersama di kelas.',
-            'Jati Diri' => 'Andini semakin percaya diri menyampaikan pendapat di depan kelas dan mampu menyelesaikan tugas kelompok bersama temannya.',
-            'Dasar-dasar Literasi, Numerasi, Sains, Teknologi, Rekayasa, dan Seni' => 'Andini mengenali huruf awal namanya dan senang bereksperimen dengan bahan sederhana di kelas.',
-            'Proyek Penguatan Profil Pelajar Pancasila' => "Andini bekerja sama dengan teman sekelompok menyusun proyek alat transportasi. Ia menyumbang ide bentuk roda dan membantu mewarnai hasil karya kelompok.\n\nAdapun pencapaian perkembangan berdasarkan 8 dimensi lulusan, ia menunjukkan beberapa perkembangan seperti:\n1. Kolaborasi\nIa bekerja sama dengan teman sekelompok saat menyusun proyek.\n2. Kreativitas\nIa menyumbang ide bentuk roda untuk alat transportasi kelompoknya.\n\nHarapan ke depan, ia semakin berani menyampaikan idenya dalam kerja kelompok.",
-            'Bahasa Inggris' => 'Andini mampu menyebutkan kosakata sederhana tentang warna dan anggota tubuh. Ia senang menyanyi lagu bahasa Inggris bersama teman sekelas.',
-            'Bahasa Mandarin' => 'Andini mengenali pinyin sederhana dan mengikuti gerakan lagu Mandarin bersama teman sekelas.',
-            'Komputer' => 'Andini terampil menggunakan mouse dan mengenali bagian utama komputer. Ia senang menggambar menggunakan aplikasi Paint.',
-            'Budaya Humanis' => 'Andini mempraktikkan sikap duduk seperti lonceng dan mengikuti etika makan pada kelas saji teh dengan tertib.',
+        $mapelPerKunci = [
+            'agama' => [$mapelAgama, $indikator],
+            'jati' => [$mapelJati, collect()],
+            'literasi' => [$mapelLiterasi, collect()],
+            'proyek' => [$mapelKokurikuler, collect()],
+            'inggris' => [$mapelInggris, $indikatorInggris],
+            'mandarin' => [$mapelMandarin, $indikatorMandarin],
+            'komputer' => [$mapelKomputer, $indikatorKomputer],
+            'budaya' => [$mapelBudaya, $indikatorBudaya],
         ];
 
-        $siswaRespect = collect([
-            ['Andini Pratiwi', '0154872301', JenisKelamin::Perempuan],
-            ['Bima Arya Saputra', '0154872302', JenisKelamin::LakiLaki],
-            ['Clarissa Wijaya', '0154872303', JenisKelamin::Perempuan],
-            ['Dimas Nugroho', '0154872304', JenisKelamin::LakiLaki],
-            ['Erika Salim', '0154872305', JenisKelamin::Perempuan],
-            ['Fajar Alvaro', '0154872306', JenisKelamin::LakiLaki],
-            ['Gabriela Tanu', '0154872307', JenisKelamin::Perempuan],
-        ])->map(fn (array $s) => Siswa::factory()->create([
-            'Nama' => $s[0],
-            'NISN' => $s[1],
-            'Jenis_Kelamin' => $s[2],
-        ]));
-
-        // unplaced students, shown in the placement screen and Data Siswa
+        // Unplaced students, shown in the placement screen and Data Siswa.
         collect([
             ['Elena Puspita', '0154872312', JenisKelamin::Perempuan],
             ['Hana Lestari', '0154872315', JenisKelamin::Perempuan],
-            ['Ivan Pratama', '0154872316', JenisKelamin::LakiLaki],
-            ['Jessica Tanoto', '0154872317', JenisKelamin::Perempuan],
-            ['Kevin Wijaya', '0154872318', JenisKelamin::LakiLaki],
             ['Lina Marlina', '0154872319', JenisKelamin::Perempuan],
         ])->each(fn (array $s) => Siswa::factory()->create([
             'Nama' => $s[0],
@@ -324,96 +309,90 @@ class DemoDataSeeder extends Seeder
             'Jenis_Kelamin' => $s[2],
         ]));
 
-        $pola = [
-            RaporStatus::Disetujui, RaporStatus::Disetujui, RaporStatus::Menunggu,
-            RaporStatus::Draft, RaporStatus::PerluRevisi, RaporStatus::BelumDiisi,
-            RaporStatus::Draft,
-        ];
-
-        foreach ($siswaRespect->values() as $index => $siswa) {
-            $rapor = Rapor::factory()->create([
-                'Siswa_ID' => $siswa->getKey(),
-                'Kelas_ID' => $kelasRespect->getKey(),
-                'Semester' => Semester::Ganjil,
-                'Status' => $pola[$index],
-                'Disetujui_Oleh' => $pola[$index] === RaporStatus::Disetujui ? $kepalaSekolah->getKey() : null,
-                'Tanggal_Persetujuan' => $pola[$index] === RaporStatus::Disetujui ? now() : null,
-                // A report sent back always carries the principal's reason.
-                'Catatan_Revisi' => $pola[$index] === RaporStatus::PerluRevisi
-                    ? 'Narasi Jati Diri perlu diperbaiki tata bahasanya.'
-                    : null,
-            ]);
-
-            if ($pola[$index] === RaporStatus::BelumDiisi) {
-                continue;
-            }
-
-            $lengkap = ! in_array($pola[$index], [RaporStatus::Draft, RaporStatus::PerluRevisi], true);
-
-            foreach ($narasiTeks as $namaMapel => $teks) {
-                // The samples are written about one child; each report names its own.
-                $teks = str_replace('Andini', strtok($siswa->Nama, ' '), $teks);
-
-                $mapel = match (true) {
-                    str_contains($namaMapel, 'Agama') => $mapelAgama,
-                    str_contains($namaMapel, 'Jati Diri') => $mapelJati,
-                    str_contains($namaMapel, 'Literasi') => $mapelLiterasi,
-                    str_contains($namaMapel, 'Proyek') => $mapelKokurikuler,
-                    str_contains($namaMapel, 'Inggris') => $mapelInggris,
-                    str_contains($namaMapel, 'Mandarin') => $mapelMandarin,
-                    str_contains($namaMapel, 'Komputer') => $mapelKomputer,
-                    str_contains($namaMapel, 'Budaya') => $mapelBudaya,
-                    default => $mapelAgama,
-                };
-
-                $narasi = Narasi::factory()->create([
-                    'Rapor_ID' => $rapor->getKey(),
-                    'Mapel_ID' => $mapel->getKey(),
-                    'Catatan_Guru' => 'Anak mulai berani speak up di depan kelas.',
-                    'Draft_Narasi' => $teks,
-                    'Narasi_Final' => $pola[$index] === RaporStatus::Disetujui ? $teks : null,
-                    'Status_Narasi' => $pola[$index] === RaporStatus::Disetujui ? StatusNarasi::Final : StatusNarasi::Draft,
-                ]);
-
-                // Only the prose subjects carry scored indicators in the reference; the
-                // table subjects do too, so score whichever programme this subject owns.
-                $milik = match ($mapel->getKey()) {
-                    $mapelAgama->getKey() => $indikator,
-                    $mapelInggris->getKey() => $indikatorInggris,
-                    $mapelKomputer->getKey() => $indikatorKomputer,
-                    $mapelBudaya->getKey() => $indikatorBudaya,
-                    $mapelMandarin->getKey() => $indikatorMandarin,
-                    default => collect(),
-                };
-
-                if ($milik->isNotEmpty()) {
-                    $sampled = $lengkap ? $milik : $milik->take(3);
-
-                    foreach ($sampled as $i => $ind) {
-                        NilaiSiswa::factory()->create([
-                            'Narasi_ID' => $narasi->getKey(),
-                            'Indikator_ID' => $ind->getKey(),
-                            'Nilai' => $i % 3 === 0 ? Nilai::BerkembangSangatBaik : ($i % 3 === 1 ? Nilai::BerkembangSesuaiHarapan : Nilai::MulaiBerkembang),
-                            'Dipilih_Untuk_Narasi' => $i < 2,
-                        ]);
-                    }
-                }
-
-                // Prose sections print a three-photo strip; the table-template pages
-                // carry a single photo inside the Catatan block instead.
-                $jumlahFoto = $mapel->Jenis_Mapel === JenisMataPelajaran::MuatanLokal ? 1 : Dokumentasi::MAKS_FOTO;
-
-                foreach ($this->fotoKegiatan($mapel->Nama_Mapel, $jumlahFoto) as $berkas) {
-                    Dokumentasi::factory()->create([
-                        'Narasi_ID' => $narasi->getKey(),
-                        'Foto' => $berkas,
-                        'Keterangan' => 'Dokumentasi kegiatan '.$mapel->Nama_Mapel,
-                    ]);
-                }
+        foreach ([[$kelasRespect, DataContohRapor::kelasRespect()], [$kelasSincerity, DataContohRapor::kelasSincerity()]] as [$kelas, $daftar]) {
+            foreach ($daftar as $nisn => $data) {
+                $this->buatRapor($kelas, (string) $nisn, $data, $mapelPerKunci, $kepalaSekolah);
             }
         }
 
-        $this->command->info('Demo data siap. Akun: sari@tkcktc.sch.id (Guru Wali Kelas), ratna@tkcktc.sch.id (Guru Mata Pelajaran), andre@tkcktc.sch.id (Tata Usaha), mei@tkcktc.sch.id (Kepala Sekolah) - password: rahasia-kuat');
+        $this->command->info('Demo data siap. Akun: admin@tkcktc.sch.id (Administrator), sari@tkcktc.sch.id (Guru Wali Kelas), ratna@tkcktc.sch.id (Guru Mata Pelajaran), andre@tkcktc.sch.id (Tata Usaha), mei@tkcktc.sch.id (Kepala Sekolah) - password: rahasia-kuat');
+    }
+
+    /**
+     * Create one student's report from its demo record.
+     *
+     * @param  array<string, mixed>  $data
+     * @param  array<string, array{0: MataPelajaran, 1: Collection<int, IndikatorCapaian>}>  $mapelPerKunci
+     */
+    private function buatRapor(Kelas $kelas, string $nisn, array $data, array $mapelPerKunci, User $kepalaSekolah): void
+    {
+        $status = RaporStatus::from($data['status']);
+        $disetujui = $status === RaporStatus::Disetujui;
+        // Submitted reports are complete; those still in progress are missing a few ratings.
+        $lengkap = in_array($status, [RaporStatus::Disetujui, RaporStatus::Menunggu], true);
+
+        $siswa = Siswa::factory()->create([
+            'Nama' => $data['nama'],
+            'NISN' => $nisn,
+            'Jenis_Kelamin' => $data['kelamin'] === 'P' ? JenisKelamin::Perempuan : JenisKelamin::LakiLaki,
+        ]);
+
+        $rapor = Rapor::factory()->create([
+            'Siswa_ID' => $siswa->getKey(),
+            'Kelas_ID' => $kelas->getKey(),
+            'Semester' => Semester::Ganjil,
+            'Status' => $status,
+            'Tinggi_Badan' => $data['tinggi'],
+            'Berat_Badan' => $data['berat'],
+            'Lingkar_Kepala' => $data['lingkar'],
+            'Status_Pertumbuhan' => $data['pertumbuhan'],
+            'Sakit' => $data['sakit'],
+            'Izin' => $data['izin'],
+            'Tanpa_Keterangan' => $data['alpa'],
+            'Disetujui_Oleh' => $disetujui ? $kepalaSekolah->getKey() : null,
+            'Tanggal_Persetujuan' => $disetujui ? now() : null,
+            // A report sent back always carries the principal's reason.
+            'Catatan_Revisi' => $data['revisi'] ?? null,
+        ]);
+
+        foreach ($data['catatan'] as $kunci => $catatan) {
+            [$mapel, $milik] = $mapelPerKunci[$kunci];
+
+            // Reports in progress only hold the narratives their record names.
+            $teks = ($lengkap || in_array($kunci, $data['narasi'] ?? [], true))
+                ? DataContohRapor::narasi($nisn, $kunci) ?? $catatan
+                : null;
+
+            $narasi = Narasi::factory()->create([
+                'Rapor_ID' => $rapor->getKey(),
+                'Mapel_ID' => $mapel->getKey(),
+                'Catatan_Guru' => $catatan,
+                'Draft_Narasi' => $teks,
+                'Narasi_Final' => $disetujui ? $teks : null,
+                'Status_Narasi' => $disetujui ? StatusNarasi::Final : StatusNarasi::Draft,
+            ]);
+
+            foreach (($lengkap ? $milik : $milik->take(3))->values() as $i => $ind) {
+                NilaiSiswa::factory()->create([
+                    'Narasi_ID' => $narasi->getKey(),
+                    'Indikator_ID' => $ind->getKey(),
+                    'Nilai' => Nilai::from($data['nilai'][$i % count($data['nilai'])]),
+                    'Dipilih_Untuk_Narasi' => true,
+                ]);
+            }
+
+            // Prose sections print a three-photo strip; the table-template pages
+            // carry a single photo inside the Catatan block instead.
+            $jumlahFoto = $mapel->Jenis_Mapel === JenisMataPelajaran::MuatanLokal ? 1 : Dokumentasi::MAKS_FOTO;
+
+            foreach ($this->fotoKegiatan($mapel->Nama_Mapel, $jumlahFoto, $nisn) as $berkas) {
+                Dokumentasi::factory()->create([
+                    'Narasi_ID' => $narasi->getKey(),
+                    'Foto' => $berkas,
+                    'Keterangan' => 'Dokumentasi kegiatan '.$mapel->Nama_Mapel,
+                ]);
+            }
+        }
     }
 
     /**
@@ -424,9 +403,10 @@ class DemoDataSeeder extends Seeder
      *
      * @return array<int, string>
      */
-    private function fotoKegiatan(string $namaMapel, int $jumlah = 3): array
+    private function fotoKegiatan(string $namaMapel, int $jumlah, string $nisn): array
     {
-        $slug = Str::slug($namaMapel);
+        // One set per student, so deleting a photo on one report leaves the others.
+        $slug = $nisn.'-'.Str::slug($namaMapel);
         $berkas = [];
 
         for ($i = 1; $i <= $jumlah; $i++) {

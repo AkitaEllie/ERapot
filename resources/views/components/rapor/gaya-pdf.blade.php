@@ -72,6 +72,20 @@
         white-space: pre-line;
     }
 
+    /* The CJK font's tall line box would otherwise push a Mandarin page past one sheet. */
+    .rapor-dokumen td.whitespace-pre-line {
+        line-height: 1.15;
+        padding: 2px 6px;
+    }
+
+    .rapor-dokumen .penutup-halaman {
+        margin-top: 8px;
+    }
+
+    .rapor-dokumen .penutup-halaman tr {
+        page-break-inside: avoid;
+    }
+
     /* A numbered or bulleted narrative list: the item, then its description below. */
     .rapor-dokumen .narasi-butir {
         margin: 0 0 2px 8px;

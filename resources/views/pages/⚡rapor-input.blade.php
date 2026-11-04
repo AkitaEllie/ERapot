@@ -2,8 +2,8 @@
 
 use App\Enums\Nilai;
 use App\Enums\StatusNarasi;
-use App\Exceptions\NarasiTidakTersedia;
 use App\Livewire\Concerns\MengajukanRapor;
+use App\Jobs\SusunNarasi;
 use App\Models\Dokumentasi;
 use App\Models\IndikatorCapaian;
 use App\Models\MataPelajaran;
@@ -12,10 +12,8 @@ use App\Models\Narasi;
 use App\Models\Pembelajaran;
 use App\Models\ProgramPengembangan;
 use App\Models\Rapor;
-use App\Services\GeminiApi;
 use Illuminate\Support\Collection;
 use Symfony\Component\HttpKernel\Exception\HttpException;
-use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 use Livewire\Attributes\Computed;
@@ -41,6 +39,9 @@ class extends \Livewire\Component
 
     public string $draftNarasi = '';
 
+    /** Whether this screen is waiting on a background generation, which drives its polling. */
+    public bool $menungguGenerate = false;
+
     /** @var array<int, \Livewire\Features\SupportFileUploads\TemporaryUploadedFile> */
     public array $fotoBaru = [];
 
@@ -52,6 +53,8 @@ class extends \Livewire\Component
 
         $this->catatan = $narasi?->Catatan_Guru ?? '';
         $this->draftNarasi = $narasi?->Draft_Narasi ?? '';
+        $this->menungguGenerate = filled($narasi?->Generate_Token);
+        $this->periksaGenerate();
 
         foreach ($this->program->flatMap(fn (ProgramPengembangan $program): Collection => $program->indikatorCapaian) as $indikator) {
             $terisi = $narasi?->nilaiSiswa->firstWhere('Indikator_ID', $indikator->getKey());
@@ -131,6 +134,14 @@ class extends \Livewire\Component
             return;
         }
 
+        $this->periksaGenerate();
+
+        if ($this->menungguGenerate) {
+            session()->flash('galat', 'Narasi sedang disusun AI. Tunggu hingga selesai atau batalkan terlebih dahulu.');
+
+            return;
+        }
+
         $this->validate(['draftNarasi' => ['required', 'string']], [
             'draftNarasi.required' => 'Narasi masih kosong. Tekan Generate Narasi atau tulis narasinya sendiri.',
         ]);
@@ -173,10 +184,14 @@ class extends \Livewire\Component
 
     protected function simpanTabIni(): void
     {
+        // Picks up a result that landed since the last poll, so the old text on this
+        // screen cannot overwrite it.
+        $this->periksaGenerate();
+
         $narasi = $this->ensureNarasi();
         $this->simpanNilaiDanCatatan();
 
-        if ($this->draftNarasi !== (string) $narasi->Draft_Narasi) {
+        if (! $this->menungguGenerate && $this->draftNarasi !== (string) $narasi->Draft_Narasi) {
             $narasi->editNarasi($this->draftNarasi);
         }
 
@@ -218,22 +233,53 @@ class extends \Livewire\Component
             return;
         }
 
-        try {
-            $hasil = app(GeminiApi::class)->kirimPrompt($narasi->susunPrompt());
-        } catch (NarasiTidakTersedia $e) {
-            // The provider is unconfigured or failed. Tell the teacher what to do,
-            // keep the technical cause for the log.
-            Log::warning('Narasi gagal dibuat', ['narasi' => $narasi->getKey(), 'sebab' => $e->getMessage()]);
-            session()->flash('galat', $e->pesanUntukPengguna());
-
+        if ($narasi->sedangGenerate()) {
             return;
         }
 
-        // The draft is stored straight away, so a refresh does not lose it; the
-        // teacher still reviews and edits it before saving the narrative.
-        $narasi->simpanDraft($hasil);
-        $this->rapor->tandaiSedangDiisi();
-        $this->draftNarasi = $hasil;
+        // The provider can take minutes, so it runs on the queue. The job stores the
+        // draft itself, so leaving this screen does not lose it; the teacher still
+        // reviews and edits it before saving the narrative.
+        SusunNarasi::dispatch($narasi->getKey(), $narasi->mulaiGenerate());
+
+        $this->menungguGenerate = true;
+        $this->periksaGenerate();
+    }
+
+    /**
+     * Polled while waiting: brings the finished draft, or the failure, onto the screen.
+     */
+    public function periksaGenerate(): void
+    {
+        if (! $this->menungguGenerate) {
+            return;
+        }
+
+        unset($this->narasi);
+        $narasi = $this->narasi;
+
+        if ($narasi?->generateTerlambat()) {
+            $narasi->gagalGenerate($narasi->Generate_Token, 'Narasi belum selesai dibuat. Coba lagi, dan hubungi administrator bila terus terjadi.');
+        }
+
+        if ($narasi?->sedangGenerate()) {
+            return;
+        }
+
+        $this->menungguGenerate = false;
+
+        if ($narasi !== null && blank($narasi->Generate_Galat)) {
+            $this->draftNarasi = (string) $narasi->Draft_Narasi;
+            session()->flash('sukses', 'Narasi selesai disusun. Periksa dan sunting sebelum disimpan.');
+        }
+    }
+
+    public function batalkanGenerate(): void
+    {
+        unset($this->narasi);
+        $this->narasi?->batalkanGenerate();
+
+        $this->menungguGenerate = false;
         unset($this->narasi);
     }
 
@@ -462,16 +508,28 @@ class extends \Livewire\Component
                 <section>
                     <div class="flex items-center justify-between">
                         <h3 class="text-[16px] font-semibold text-heading">Narasi Rapor</h3>
-                        <x-ui.button type="button" :variant="filled($draftNarasi) ? 'secondary' : 'primary'" wire:click="generateNarasi" wire:loading.attr="disabled" wire:target="generateNarasi" :disabled="! $rapor->bolehDiubah()">
-                            <span wire:loading.remove wire:target="generateNarasi">{{ filled($draftNarasi) ? 'Generate Ulang' : 'Generate Narasi' }}</span>
-                            <span wire:loading wire:target="generateNarasi">Menyusun narasi...</span>
+                        <x-ui.button type="button" :variant="filled($draftNarasi) ? 'secondary' : 'primary'" wire:click="generateNarasi" wire:loading.attr="disabled" wire:target="generateNarasi" :disabled="! $rapor->bolehDiubah() || $menungguGenerate">
+                            @if ($menungguGenerate)
+                                Menyusun narasi...
+                            @else
+                                <span wire:loading.remove wire:target="generateNarasi">{{ filled($draftNarasi) ? 'Generate Ulang' : 'Generate Narasi' }}</span>
+                                <span wire:loading wire:target="generateNarasi">Mengirim...</span>
+                            @endif
                         </x-ui.button>
                     </div>
+                    @if ($menungguGenerate)
+                        <div wire:poll.3s="periksaGenerate" role="status" class="mt-2 flex items-center justify-between gap-3 rounded border border-hairline bg-canvas px-3 py-2 text-[14px] text-label">
+                            <span>AI sedang menyusun narasi. Halaman ini boleh ditinggalkan; hasilnya tersimpan otomatis.</span>
+                            <x-ui.button type="button" variant="ghost" size="sm" wire:click="batalkanGenerate">Batalkan</x-ui.button>
+                        </div>
+                    @elseif (filled($this->narasi?->Generate_Galat))
+                        <p role="alert" class="mt-2 rounded border border-rose-200 bg-rose-50 px-3 py-2 text-[14px] text-rose-900">{{ $this->narasi->Generate_Galat }}</p>
+                    @endif
                     <textarea
                         wire:model="draftNarasi"
                         rows="7"
                         placeholder="Draf narasi hasil AI akan tampil di sini dan masih bisa disunting guru sebelum disimpan."
-                        @disabled(! $rapor->bolehDiubah())
+                        @disabled(! $rapor->bolehDiubah() || $menungguGenerate)
                         class="mt-2 w-full resize-y rounded border border-hairline bg-surface px-4 py-3 text-[15px] leading-relaxed text-body placeholder:text-placeholder focus:border-accent focus:ring-2 focus:ring-accent/30 focus:outline-none disabled:bg-canvas"
                     ></textarea>
                     @error('draftNarasi')
@@ -485,7 +543,7 @@ class extends \Livewire\Component
                                 <span class="text-muted">- draf AI {{ $this->narasi->Tanggal_Generate->translatedFormat('j M Y H.i') }}</span>
                             @endif
                         </div>
-                        <x-ui.button type="button" variant="primary" size="sm" wire:click="simpanNarasi" :disabled="! $rapor->bolehDiubah()">Simpan Narasi</x-ui.button>
+                        <x-ui.button type="button" variant="primary" size="sm" wire:click="simpanNarasi" :disabled="! $rapor->bolehDiubah() || $menungguGenerate">Simpan Narasi</x-ui.button>
                     </div>
                 </section>
             </aside>

@@ -178,7 +178,11 @@ describe('instruksi sistem', function (): void {
     });
 
     it('melarang mengarang fakta di luar capaian dan catatan guru', function (): void {
-        expect(InstruksiNarasi::SISTEM)->toContain('Gunakan hanya fakta dari capaian dan catatan guru');
+        expect(InstruksiNarasi::SISTEM)
+            ->toContain('seluruh fakta yang Anda miliki')
+            ->toContain('perbandingan dengan masa lalu')
+            ->toContain('tanpa diingatkan')
+            ->toContain('lebih baik daripada narasi panjang');
     });
 
     it('ditulis dalam bahasa Indonesia', function (): void {
@@ -227,6 +231,13 @@ describe('gaya per bentuk halaman', function (): void {
 
     it('meminta satu paragraf pada gaya catatan', function (): void {
         expect(InstruksiNarasi::GAYA_CATATAN)->toContain('satu paragraf saja');
+    });
+
+    it('memperlakukan jumlah kata sebagai batas, bukan kewajiban', function (): void {
+        // A required length made the model pad thin data with invented facts.
+        foreach ([InstruksiNarasi::GAYA_PROSA, InstruksiNarasi::GAYA_PROYEK, InstruksiNarasi::GAYA_CATATAN] as $gaya) {
+            expect($gaya)->toContain('hanya batas, bukan kewajiban');
+        }
     });
 
     it('memuat target jumlah kata pada kedua gaya', function (): void {
